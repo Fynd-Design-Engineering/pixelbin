@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const TRIGGER_SELECTOR = '[ff-accordion-element="trigger"]';
   const CONTENT_SELECTOR = '[ff-accordion-element="content"]';
   const ARROW_SELECTOR = '[ff-accordion-element="arrow"]';
-  const BREAKPOINT = 992; // Tablet and below
+  const BREAKPOINT = 991; // Tablet and below
 
   function isTabletOrBelow() {
     return window.innerWidth <= BREAKPOINT;

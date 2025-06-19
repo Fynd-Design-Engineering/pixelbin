@@ -171,7 +171,7 @@ function populateAllDropdowns(addons) {
         const rootContainer = dropdownWrap.closest(".pricing20_plan") || dropdownWrap.closest(".pricing22_component");
         const priceEl = rootContainer?.querySelector(".pricing_price span") ||
           dropdownWrap.closest(".pricing22_top-row-content")?.querySelector(".pricing22_top-row-price span");
-        if (priceEl) priceEl.textContent = `$${Math.round(addon.price)}`;
+        if (priceEl) priceEl.textContent = formatPriceCurrency(addon.price, addon.currencyCode);
         const selectedLabel = anchor.querySelector("div")?.textContent?.trim() || "";
         const labelTarget = dropdownWrap.querySelector(".pricing_dropdown_toggle .dropdown-value");
         if (labelTarget) labelTarget.textContent = selectedLabel;

@@ -317,7 +317,7 @@ function setupSwitcher(sectionSelector) {
 
      // NEW: hide loader and show cards after rendering
     document.querySelectorAll('.loader').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.pricing20_plan').forEach(el => el.style.display = '');
+    document.querySelectorAll('.pricing20_plan').forEach(el => el.style.display = 'block');
 
   }
 

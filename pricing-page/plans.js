@@ -135,7 +135,6 @@ const formatPriceCurrency = (
 
 // 3) Loader helpers
 function showLoaders(sectionEl, selectors) {
-  
   selectors.forEach(sel => {
     sectionEl.querySelectorAll(sel).forEach(el => {
       if (!el.querySelector(".loader")) {
@@ -149,8 +148,6 @@ function showLoaders(sectionEl, selectors) {
 }
 function hideLoaders(sectionEl) {
   sectionEl.querySelectorAll(".loader").forEach(el => el.remove());
- 
-});
 }
 
 // 4) Credit-mapping helper
@@ -314,11 +311,6 @@ function setupSwitcher(sectionSelector) {
       ".pricing_plan_subtitle"
     ]);
     updatePricing(sec, plans, billing);
-
-     // NEW: hide loader and show cards after rendering
-    document.querySelectorAll('.loader').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.pricing20_plan').forEach(el => el.style.display = 'block');
-
   }
 
   fetchPlans().then(plans => {

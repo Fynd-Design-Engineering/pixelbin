@@ -135,10 +135,6 @@ const formatPriceCurrency = (
 
 // 3) Loader helpers
 function showLoaders(sectionEl, selectors) {
-
-sectionEl.querySelectorAll('.pricing20_plan').forEach(el => {
-el.classList.add('hidden-during-load');
-});
   
   selectors.forEach(sel => {
     sectionEl.querySelectorAll(sel).forEach(el => {
@@ -153,8 +149,7 @@ el.classList.add('hidden-during-load');
 }
 function hideLoaders(sectionEl) {
   sectionEl.querySelectorAll(".loader").forEach(el => el.remove());
-  sectionEl.querySelectorAll('.pricing20_plan').forEach(el => {
-  el.classList.remove('hidden-during-load');
+ 
 });
 }
 
@@ -319,6 +314,11 @@ function setupSwitcher(sectionSelector) {
       ".pricing_plan_subtitle"
     ]);
     updatePricing(sec, plans, billing);
+
+     // NEW: hide loader and show cards after rendering
+    document.querySelectorAll('.loader').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.pricing20_plan').forEach(el => el.style.display = '');
+
   }
 
   fetchPlans().then(plans => {

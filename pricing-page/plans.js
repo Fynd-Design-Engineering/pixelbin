@@ -135,6 +135,11 @@ const formatPriceCurrency = (
 
 // 3) Loader helpers
 function showLoaders(sectionEl, selectors) {
+
+sectionEl.querySelectorAll('.pricing20_plan').forEach(el => {
+el.classList.add('hidden-during-load');
+});
+  
   selectors.forEach(sel => {
     sectionEl.querySelectorAll(sel).forEach(el => {
       if (!el.querySelector(".loader")) {
@@ -148,6 +153,9 @@ function showLoaders(sectionEl, selectors) {
 }
 function hideLoaders(sectionEl) {
   sectionEl.querySelectorAll(".loader").forEach(el => el.remove());
+  sectionEl.querySelectorAll('.pricing20_plan').forEach(el => {
+  el.classList.remove('hidden-during-load');
+});
 }
 
 // 4) Credit-mapping helper

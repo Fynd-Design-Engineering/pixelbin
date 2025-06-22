@@ -1,3 +1,22 @@
+function showLoaderAndHideCards() {
+  document.querySelectorAll('.pricing20_plan').forEach(card => {
+    card.classList.remove('visible');
+  });
+  document.querySelectorAll('.loader').forEach(loader => {
+    loader.style.display = 'block';
+  });
+}
+
+function hideLoaderAndShowCards() {
+  document.querySelectorAll('.loader').forEach(loader => {
+    loader.style.display = 'none';
+  });
+  document.querySelectorAll('.pricing20_plan').forEach(card => {
+    card.classList.add('visible');
+  });
+}
+
+
 function loadScript(url, callback) {
   const script = document.createElement("script");
   script.type = "text/javascript";
@@ -313,9 +332,14 @@ function setupSwitcher(sectionSelector) {
     updatePricing(sec, plans, billing);
   }
 
+  showLoaderAndHideCards();
+
   fetchPlans().then(plans => {
     console.log("plans => ", plans)
     render(plans); // initial load uses skipForbidden=false
+
+     hideLoaderAndShowCards();
+    
     tog.addEventListener("click", () => {
       skipForbidden = sec.matches(".pricing_contain");
       billing = billing === "yearly" ? "monthly" : "yearly";

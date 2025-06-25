@@ -212,8 +212,8 @@ function injectGlobalPlanCreditsBySuffix(plan, totalCredits, suffix) {
 
 // 5) Single-card renderer
 function renderPlanCard(targetEl, plan, billingType, suffix, priceSelector, monthlyPlan) {
-  console.log("plan", plan)
-  console.log("monthlyPlan", monthlyPlan)
+ // console.log("plan", plan)
+  //console.log("monthlyPlan", monthlyPlan)
   if (!targetEl) return;
 
   const link = targetEl.querySelector(".g_clickable_link");
@@ -300,7 +300,7 @@ function updatePricing(sectionEl, plans, billingType) {
             .filter(plan => plan.name.toLowerCase().includes("lite"))
         }
         renderPlanCard(lite, plan, billingType, "liteplan", priceSel, monthlyPlan?.[0]);
-        console.log("monthlyPlan 1", monthlyPlan);
+        // console.log("monthlyPlan 1", monthlyPlan);
       } else if (n.includes("pro")) {
         let monthlyPlan = [];
         if (billingType === "yearly") {
@@ -309,7 +309,7 @@ function updatePricing(sectionEl, plans, billingType) {
             .filter(plan => plan.name.toLowerCase().includes("pro"))
         }
         renderPlanCard(pro, plan, billingType, "proplan", priceSel, monthlyPlan?.[0]);
-        console.log("monthlyPlan 2", monthlyPlan);
+        // console.log("monthlyPlan 2", monthlyPlan);
       }
     });
 }
@@ -335,7 +335,7 @@ function setupSwitcher(sectionSelector) {
   showLoaderAndHideCards();
 
   fetchPlans().then(plans => {
-    console.log("plans => ", plans)
+    // console.log("plans => ", plans)
     render(plans); // initial load uses skipForbidden=false
 
      hideLoaderAndShowCards();

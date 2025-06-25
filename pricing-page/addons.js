@@ -53,7 +53,7 @@ async function fetchAddons() {
     }
   }
 
-  console.log({ allAddons });
+  //console.log({ allAddons });
 
   const request = {
     items: allAddons.reduce((acc, addon) => {
@@ -63,7 +63,7 @@ async function fetchAddons() {
       countryCode: country,
     },
   };
-  console.log({ request });
+  // console.log({ request });
 
   try {
     const result = await Paddle.PricePreview(request);

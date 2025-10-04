@@ -1,5 +1,3 @@
-
-
 document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("searchContainer");
   if (!container) {
@@ -827,5 +825,3 @@ document.addEventListener("DOMContentLoaded", () => {
     handleSubmit(e.detail);
   });
 })();
-
-

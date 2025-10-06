@@ -1,3 +1,4 @@
+
 (() => {
   gsap.registerPlugin(ScrollTrigger);
 
@@ -113,45 +114,12 @@
   /******************************************************************
    * IMAGE INJECTION HELPERS — COMMENTED OUT (kept to avoid breaking references)
    ******************************************************************/
-  /* -------------------- IMAGE INJECTION HELPERS (commented out) --------------------
+  /* -------------------- IMAGE INJECTION HELPers (commented out) --------------------
   let _runId = 0;
   let _abort = null;
-  function bumpRun() {
-    _runId++;
-    try { _abort?.abort(); } catch (_) {}
-    _abort = ('AbortController' in window) ? new AbortController() : null;
-    return { runId: _runId, signal: _abort?.signal };
-  }
-
-  function clearAllInjectedImages({ double = true } = {}) {
-    const doClear = () => {
-      document.querySelectorAll('#imagesSection .image-close').forEach(btn => btn.click());
-      const fi = document.getElementById('fileInput');
-      if (fi) fi.value = '';
-    };
-    doClear();
-    if (double) requestAnimationFrame(doClear);
-  }
-
-  async function injectImageViaFileInput(url, runId, signal) {
-    const fi = document.getElementById('fileInput');
-    if (!fi || !url) return;
-    try {
-      const res = await fetch(url, { mode: 'cors', signal });
-      if (runId !== _runId) return;
-      if (!res.ok) return;
-      const blob = await res.blob();
-      if (runId !== _runId) return;
-      const name = (url.split('/').pop() || 'image.png').split('?')[0];
-      const file = new File([blob], name, { type: blob.type || 'image/png' });
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      fi.files = dt.files;
-      fi.dispatchEvent(new Event('change', { bubbles: true }));
-    } catch (err) {
-      if (err?.name !== 'AbortError') console.warn('[HERO] inject error', err);
-    }
-  }
+  function bumpRun() { _runId++; try { _abort?.abort(); } catch (_) {} _abort = ('AbortController' in window) ? new AbortController() : null; return { runId: _runId, signal: _abort?.signal }; }
+  function clearAllInjectedImages({ double = true } = {}) { const doClear = () => { document.querySelectorAll('#imagesSection .image-close').forEach(btn => btn.click()); const fi = document.getElementById('fileInput'); if (fi) fi.value = ''; }; doClear(); if (double) requestAnimationFrame(doClear); }
+  async function injectImageViaFileInput(url, runId, signal) { const fi = document.getElementById('fileInput'); if (!fi || !url) return; try { const res = await fetch(url, { mode: 'cors', signal }); if (runId !== _runId) return; if (!res.ok) return; const blob = await res.blob(); if (runId !== _runId) return; const name = (url.split('/').pop() || 'image.png').split('?')[0]; const file = new File([blob], name, { type: blob.type || 'image/png' }); const dt = new DataTransfer(); dt.items.add(file); fi.files = dt.files; fi.dispatchEvent(new Event('change', { bubbles: true })); } catch (err) { if (err?.name !== 'AbortError') console.warn('[HERO] inject error', err); } }
   ------------------------------------------------------------------------------- */
 
   /******************************************************************
@@ -189,14 +157,9 @@
     const hide = (el) => el && gsap.set(el, { display: 'none',  visibility: 'hidden', autoAlpha: 0 });
 
     switch(mode){
-      case 'p2': // Prompt 2
-        show(img1); hide(img2); if (addBtn) hide(addBtn);
-        break;
-      case 'p3': // Prompt 3
-        hide(img1); show(img2); if (addBtn) hide(addBtn);
-        break;
-      default:   // 'default' and 'p1'
-        hide(img1); hide(img2); if (addBtn) show(addBtn);
+      case 'p2': show(img1); hide(img2); if (addBtn) hide(addBtn); break;
+      case 'p3': hide(img1); show(img2); if (addBtn) hide(addBtn); break;
+      default:   hide(img1); hide(img2); if (addBtn) show(addBtn);
     }
   }
   function revPlaceholderSwap(prevMode, nextMode){
@@ -206,6 +169,103 @@
       onReverseComplete: () => setPlaceholderState(prevMode)
     });
   }
+
+/* Inject one-time CSS so nav stays white even on hover/focus/active */
+function ensureNavWhiteCSS(){
+  const prev = document.getElementById('nav-white-mode-css');
+  if (prev) prev.remove();
+
+  const css = `
+  /* 1) Text to white in white-mode (links, dropdown triggers, auth, CTA, dashboard btn) */
+  .nav_component.nav-white-mode .nav_menu-link,
+  .nav_component.nav-white-mode .nav_menu-link:hover,
+  .nav_component.nav-white-mode .nav_menu-link:focus,
+  .nav_component.nav-white-mode .nav_menu-link:active,
+  .nav_component.nav-white-mode .nav_dropdown-component,
+  .nav_component.nav-white-mode .nav_dropdown-component:hover,
+  .nav_component.nav-white-mode .nav_dropdown-component:focus,
+  .nav_component.nav-white-mode .nav_dropdown-component:active,
+  .nav_component.nav-white-mode .nav_auth_sign_in,
+  .nav_component.nav-white-mode .nav_auth_sign_in:hover,
+  .nav_component.nav-white-mode .nav_auth_sign_in:focus,
+  .nav_component.nav-white-mode .nav_auth_sign_in:active,
+  .nav_component.nav-white-mode .is-nav-button,
+  .nav_component.nav-white-mode .is-nav-button:hover,
+  .nav_component.nav-white-mode .is-nav-button:focus,
+  .nav_component.nav-white-mode .is-nav-button:active,
+  .nav_component.nav-white-mode .nav_dashboard_btn,
+  .nav_component.nav-white-mode .nav_dashboard_btn:hover,
+  .nav_component.nav-white-mode .nav_dashboard_btn:focus,
+  .nav_component.nav-white-mode .nav_dashboard_btn:active {
+    color: #ffffff !important;
+  }
+
+  /* 1a) Keep button borders white; keep bg transparent (CTA + dashboard) */
+  .nav_component.nav-white-mode .is-nav-button,
+  .nav_component.nav-white-mode .is-nav-button:hover,
+  .nav_component.nav-white-mode .is-nav-button:focus,
+  .nav_component.nav-white-mode .is-nav-button:active,
+  .nav_component.nav-white-mode .nav_dashboard_btn,
+  .nav_component.nav-white-mode .nav_dashboard_btn:hover,
+  .nav_component.nav-white-mode .nav_dashboard_btn:focus,
+  .nav_component.nav-white-mode .nav_dashboard_btn:active {
+    border-color: currentColor !important;  /* = white */
+    background-color: transparent !important;
+    outline-color: currentColor !important;
+  }
+
+  /* 1b) If dashboard button contains an icon, make it follow white */
+  .nav_component.nav-white-mode .nav_dashboard_btn svg,
+  .nav_component.nav-white-mode .nav_dashboard_btn:hover svg,
+  .nav_component.nav-white-mode .nav_dashboard_btn:focus svg,
+  .nav_component.nav-white-mode .nav_dashboard_btn:active svg {
+    color: currentColor !important;
+    fill: currentColor !important;
+    stroke: currentColor !important;
+  }
+
+  /* 2) We do NOT recolor generic nav SVGs anymore (dropdown chevrons keep their palette) */
+
+  /* 3) Only force the LOGO graphics to white */
+  .nav_component.nav-white-mode .nav_logo-motif,
+  .nav_component.nav-white-mode .nav_logo-text,
+  .nav_component.nav-white-mode .nav_logo-motif *,
+  .nav_component.nav-white-mode .nav_logo-text * {
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+    color: #ffffff !important;
+  }`;
+
+  const style = document.createElement('style');
+  style.id = 'nav-white-mode-css';
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+
+
+/* Toggle white-mode + hide/show nav background shape; logo gets a runtime nudge too */
+function setNavWhiteMode(on){
+  ensureNavWhiteCSS();
+  const nav   = document.querySelector('.nav_component');
+  const navBg = document.querySelector('.nav_bg-shape');
+  const logoNodes = document.querySelectorAll(
+    '.nav_logo-motif, .nav_logo-text, .nav_logo-motif *, .nav_logo-text *'
+  );
+
+  if (on) {
+    nav && nav.classList.add('nav-white-mode');
+    if (navBg) gsap.set(navBg, { autoAlpha: 0, display: 'none' });
+    // safety in case inline styles are strong
+    gsap.set(logoNodes, { fill: '#ffffff', stroke: '#ffffff', color: '#ffffff' });
+  } else {
+    nav && nav.classList.remove('nav-white-mode');
+    if (navBg) gsap.set(navBg, { clearProps: 'display,visibility,opacity,autoAlpha' });
+    gsap.set(logoNodes, { clearProps: 'fill,stroke,color' });
+  }
+}
+
+
+
 
   function showBg(n) {
     const idx = n - 1;
@@ -257,31 +317,45 @@
         const activeTextColor = '#ffffff'; // for .text-input and .char-counter
         const activeBtn = { background: '#ffffff', color: '#000000' };
 
-        // Phase-specific logic (colors + search-form + new elements)
+        // Phase-specific logic (colors + search-form + new elements + NAV)
         if (n === 2) {
           headlineEl.style.color    = HEADLINE_COLORS.Create;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Create;
+
+          setNavWhiteMode(true); // invert nav
+
           if (searchForm) gsap.set(searchForm, inputStyle);
           if (inputEl)   inputEl.style.color = activeTextColor;
           if (charCounter) gsap.set(charCounter, { color: activeTextColor });
           if (generateButton) gsap.set(generateButton, activeBtn);
+
         } else if (n === 4) {
           headlineEl.style.color    = HEADLINE_COLORS.Edit;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Edit;
+
+          setNavWhiteMode(true); // invert nav
+
           if (searchForm) gsap.set(searchForm, inputStyle);
           if (inputEl)   inputEl.style.color = activeTextColor;
           if (charCounter) gsap.set(charCounter, { color: activeTextColor });
           if (generateButton) gsap.set(generateButton, activeBtn);
+
         } else if (n === 6) {
           headlineEl.style.color    = HEADLINE_COLORS.Enhance;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Enhance;
+
+          setNavWhiteMode(true); // invert nav
+
           if (searchForm) gsap.set(searchForm, inputStyle);
           if (inputEl)   inputEl.style.color = activeTextColor;
           if (charCounter) gsap.set(charCounter, { color: activeTextColor });
           if (generateButton) gsap.set(generateButton, activeBtn);
+
         } else if (n === 1) {
           headlineEl.style.color    = HEADLINE_COLORS.Default;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Default;
+
+          setNavWhiteMode(false); // restore nav
 
           // Reset styles we touched (only those props)
           if (searchForm) gsap.set(searchForm, { clearProps: 'all' });
@@ -398,7 +472,6 @@
     // Put the pill text into the input at each step
     tl.add(revInputSwap(prevText,nextText));
     if (placeholderAfterInput?.from && placeholderAfterInput?.to) {
-      // EXACTLY aligned with input swap
       tl.add(revPlaceholderSwap(placeholderAfterInput.from, placeholderAfterInput.to));
     }
     if (headlineAfterInput?.from && headlineAfterInput?.to) {

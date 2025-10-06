@@ -28,7 +28,7 @@
     ],
   };
 
-  // Image URLs used for auto-injection
+  // Image URLs used for auto-injection (kept; now unused)
   const IMG_EDIT =
     'https://cdn.prod.website-files.com/673193e0642e6ad25696fcd4/68d4eaa730a11decd3b6fef1_Editing-1.png';
   const IMG_ENHANCE =
@@ -103,13 +103,14 @@
     inputEl.setAttribute('value', '');
   }
 
-  // ★ Ensure Start layout: pills visible (flex), try-images hidden
+  // Start layout: pills visible; try-images hidden
   setPillsDisplay(true);
   setTryImagesDisplay(false);
 
   /******************************************************************
-   * IMAGE INJECTION HELPERS
+   * IMAGE INJECTION HELPERS — COMMENTED OUT (kept to avoid breaking references)
    ******************************************************************/
+  /* -------------------- IMAGE INJECTION HELPERS (commented out) --------------------
   let _runId = 0;
   let _abort = null;
   function bumpRun() {
@@ -148,25 +149,25 @@
       if (err?.name !== 'AbortError') console.warn('[HERO] inject error', err);
     }
   }
+  ------------------------------------------------------------------------------- */
 
   /******************************************************************
    * HELPERS (‼️ restored)
    ******************************************************************/
   // Use flex so your pill row layout stays intact
-function setPillsDisplay(show) {
-  const nodes = document.querySelectorAll('.anaimtion-promt-pill');
-  nodes.forEach(n => {
-    if (show) {
-      gsap.set(n, { clearProps: 'all' }); // remove any inline overrides
-      n.style.display = 'flex';
-      n.style.visibility = 'visible';
-    } else {
-      // use cssText to force !important
-      n.style.cssText += 'display: none !important; visibility: hidden !important;';
-    }
-  });
-}
-
+  function setPillsDisplay(show) {
+    const nodes = document.querySelectorAll('.anaimtion-promt-pill');
+    nodes.forEach(n => {
+      if (show) {
+        gsap.set(n, { clearProps: 'all' }); // remove any inline overrides
+        n.style.display = 'flex';
+        n.style.visibility = 'visible';
+      } else {
+        // use cssText to force !important
+        n.style.cssText += 'display: none !important; visibility: hidden !important;';
+      }
+    });
+  }
 
   // Toggle the Try Images container per your rules
   function setTryImagesDisplay(show) {
@@ -178,6 +179,10 @@ function setPillsDisplay(show) {
   function showBg(n) {
     const idx = n - 1;
     if (!bgEls[idx]) return;
+
+    const searchForm     = document.querySelector('.search-form');      // input container glass
+    const charCounter    = document.querySelector('.char-counter');     // new
+    const generateButton = document.querySelector('.generate-button');  // new
 
     // Hide others
     bgEls.forEach((el, i) => {
@@ -200,18 +205,59 @@ function setPillsDisplay(show) {
       overwrite: true,
       onStart: () => {
         if (!headlineEl || !subHeadlineEl) return;
+
+        // Shared style for .search-form during non-default phases
+        const inputStyle = {
+          backdropFilter: 'blur(100px)',
+          WebkitBackdropFilter: 'blur(100px)',
+          border: '1px solid rgba(255, 255, 255, 1)',
+          background: 'rgba(255, 255, 255, 0.3)',
+          color: '#ffffff',
+          boxShadow: `
+            0px 2px 5px 0px rgba(47, 40, 53, 0.15),
+            0px 10px 10px 0px rgba(47, 40, 53, 0.13),
+            0px 21px 13px 0px rgba(47, 40, 53, 0.08),
+            0px 38px 15px 0px rgba(47, 40, 53, 0.02),
+            0px 60px 17px 0px rgba(47, 40, 53, 0)
+          `
+        };
+
+        // Additional synced styles (requested)
+        const activeTextColor = '#ffffff'; // for .text-input and .char-counter
+        const activeBtn = { background: '#ffffff', color: '#000000' };
+
+        // Phase-specific logic (colors + search-form + new elements)
         if (n === 2) {
           headlineEl.style.color    = HEADLINE_COLORS.Create;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Create;
+          if (searchForm) gsap.set(searchForm, inputStyle);
+          if (inputEl)   inputEl.style.color = activeTextColor;
+          if (charCounter) gsap.set(charCounter, { color: activeTextColor });
+          if (generateButton) gsap.set(generateButton, activeBtn);
         } else if (n === 4) {
           headlineEl.style.color    = HEADLINE_COLORS.Edit;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Edit;
+          if (searchForm) gsap.set(searchForm, inputStyle);
+          if (inputEl)   inputEl.style.color = activeTextColor;
+          if (charCounter) gsap.set(charCounter, { color: activeTextColor });
+          if (generateButton) gsap.set(generateButton, activeBtn);
         } else if (n === 6) {
           headlineEl.style.color    = HEADLINE_COLORS.Enhance;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Enhance;
+          if (searchForm) gsap.set(searchForm, inputStyle);
+          if (inputEl)   inputEl.style.color = activeTextColor;
+          if (charCounter) gsap.set(charCounter, { color: activeTextColor });
+          if (generateButton) gsap.set(generateButton, activeBtn);
         } else if (n === 1) {
           headlineEl.style.color    = HEADLINE_COLORS.Default;
           subHeadlineEl.style.color = SUBHEAD_COLORS.Default;
+
+          // Reset styles we touched (only those props)
+          if (searchForm) gsap.set(searchForm, { clearProps: 'all' });
+          if (inputEl)    inputEl.style.color = ''; // revert to CSS default
+          if (charCounter) gsap.set(charCounter, { clearProps: 'color' });
+          if (generateButton) gsap.set(generateButton, { clearProps: 'background,color' });
+
           if (marqueeWrapper) {
             if (state.allowMarquee) {
               gsap.to(marqueeWrapper, { autoAlpha: 1, duration: 0.5 });
@@ -278,7 +324,7 @@ function setPillsDisplay(show) {
     return gsap.to({}, { duration: 0.01, onComplete: () => showBg(nextN), onReverseComplete: () => showBg(prevN) });
   }
 
-  // ‼️ This is what writes the pill prompt into the input field
+  // Writes the pill prompt into the input field
   function revInputSwap(prevText, nextText) {
     return gsap.to({}, {
       duration: 0.01,
@@ -318,11 +364,12 @@ function setPillsDisplay(show) {
     if (after1c) tl.to(after1c, {...SLOTS[0],duration:0.35,ease:'none'},'<');
     if (after2c) tl.to(after2c, {...SLOTS[1],duration:0.35,ease:'none'},'<');
 
-    // ✅ Put the pill text into the input at each step
+    // Put the pill text into the input at each step
     tl.add(revInputSwap(prevText,nextText));
     if (headlineAfterInput?.from && headlineAfterInput?.to) tl.add(revHeadlineStep(headlineAfterInput.from,headlineAfterInput.to));
 
-    // Image swap symmetry
+    // Image swap symmetry — COMMENTED OUT (no injection)
+    /*
     if (image && (image.url || image.clear || image.prevUrl)) {
       tl.add(gsap.to({}, {
         duration: 0.01,
@@ -342,6 +389,7 @@ function setPillsDisplay(show) {
         }
       }));
     }
+    */
 
     if (baseBg) { tl.add(revBgStep(baseBg,baseBg)); tl.add(revGen(true)); }
     tl.add(spacer(0.2));
@@ -364,20 +412,20 @@ function setPillsDisplay(show) {
   master.add(segmentForPill(1, pillTexts[0], pillTexts[1], {
     headlineAfterInput: { from: 'create', to: 'edit' },
     baseBg: 3, nextBg: 4,
-    image: { url: IMG_EDIT }
+    image: { url: IMG_EDIT } // kept but unused
   }));
   master.addLabel('seg2End');
 
   master.add(segmentForPill(2, pillTexts[1], pillTexts[2], {
     headlineAfterInput: { from: 'edit', to: 'enhance' },
     baseBg: 5, nextBg: 6,
-    image: { clear: true, url: IMG_ENHANCE, prevUrl: IMG_EDIT }
+    image: { clear: true, url: IMG_ENHANCE, prevUrl: IMG_EDIT } // kept but unused
   }));
   master.addLabel('seg3End');
 
   // END STAGE — keeps snap + reverse working, plus toggles try-images
   const endTl=gsap.timeline();
-  endTl.to(inputEl,{yPercent:0,autoAlpha:0,duration:0.35,ease:'power2.out'});
+  endTl.to(inputEl,{yPercent:0,autoAlpha:0,duration:0.1,ease:'none'});
   endTl.add(gsap.to({},{
     duration:0.01,
     onStart:()=>{state.allowMarquee=true;},
@@ -388,8 +436,8 @@ function setPillsDisplay(show) {
   endTl.add(gsap.to({},{
     duration:0.01,
     onComplete:()=>{ 
-      bumpRun();
-      clearAllInjectedImages();
+      /* bumpRun(); */
+      /* clearAllInjectedImages(); */
       setRealInputValue(inputEl,''); 
       inputEl.placeholder = TEXT.PLACEHOLDER.final; 
       setGeneratingVisible(false); 
@@ -397,8 +445,8 @@ function setPillsDisplay(show) {
     onReverseComplete:()=>{ 
       setRealInputValue(inputEl,pillTexts[2]||''); 
       inputEl.placeholder=''; 
-      const { runId, signal } = bumpRun();
-      requestAnimationFrame(() => injectImageViaFileInput(IMG_ENHANCE, runId, signal));
+      /* const { runId, signal } = bumpRun();
+         requestAnimationFrame(() => injectImageViaFileInput(IMG_ENHANCE, runId, signal)); */
     }
   }));
   // Pills fade → remove from layout; reverse restores. Also toggle try-images here.
@@ -409,7 +457,7 @@ function setPillsDisplay(show) {
     onComplete: () => { setPillsDisplay(false); setTryImagesDisplay(true); },     // END: show try-images
     onReverseComplete: () => { setTryImagesDisplay(false); setPillsDisplay(true); } // REVERSE: back to Start
   }));
-  endTl.to(inputEl,{yPercent:0,autoAlpha:1,duration:0.25,ease:'power2.out'});
+  endTl.to(inputEl,{yPercent:0,autoAlpha:1,duration:0.01,ease:'none'});
   master.add(endTl);
   master.addLabel('end');
 
@@ -487,8 +535,8 @@ function setPillsDisplay(show) {
 
     // switch visual state to END baseline
     tl.add(() => {
-      bumpRun();
-      clearAllInjectedImages();
+      /* bumpRun(); */
+      /* clearAllInjectedImages(); */
 
       state.allowMarquee = true;
       showBg(1);
@@ -553,7 +601,7 @@ function setPillsDisplay(show) {
         ...extra
       };
       // Console
-     // try { console.log('[HERO_LOG]', payload); } catch(_) {}
+      //try { console.log('[HERO_LOG]', payload); } catch(_) {}
       // GTM/GA dataLayer
       try { window.dataLayer && window.dataLayer.push({ event: LOG_EVENT, name, ...payload }); } catch(_) {}
       // Custom analytics

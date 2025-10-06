@@ -553,7 +553,7 @@ function setPillsDisplay(show) {
         ...extra
       };
       // Console
-      try { console.log('[HERO_LOG]', payload); } catch(_) {}
+     // try { console.log('[HERO_LOG]', payload); } catch(_) {}
       // GTM/GA dataLayer
       try { window.dataLayer && window.dataLayer.push({ event: LOG_EVENT, name, ...payload }); } catch(_) {}
       // Custom analytics

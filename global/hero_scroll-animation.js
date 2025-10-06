@@ -487,28 +487,50 @@
     return (local >= FWD_THRESH) ? seg.end : seg.start;
   }
 
-  ScrollTrigger.create({
-    id:'hero',
-    animation: master,
-    trigger: WRAPPER_SEL,
-    start: 'top top',
-    end: 'bottom bottom',
-    scrub: 1,
-    pin: PINNED_SEL,
-    anticipatePin: 1,
-    snap: {
-      snapTo: (value) => snapToNearestStep(value),
-      duration: { min: 0.2, max: 0.4 },
-      ease: 'power1.inOut',
-      delay: 0
-    },
-    onUpdate(self){
-      if(state.lockedAtEnd){
-        self.animation.progress(1);
-        self.scroll(self.end);
-      }
+  function lockToEnd(){
+  const st = ScrollTrigger.getById('hero');
+  state.lockedAtEnd = true;
+  if (st) {
+    st.animation.progress(1).pause();
+    st.scroll(st.end);
+  }
+}
+
+
+ScrollTrigger.create({
+  id:'hero',
+  animation: master,
+  trigger: WRAPPER_SEL,
+  start: 'top top',
+  end: 'bottom bottom',
+  scrub: 1,
+  pin: PINNED_SEL,
+  anticipatePin: 1,
+  snap: {
+    snapTo: (value) => snapToNearestStep(value),
+    duration: { min: 0.2, max: 0.4 },
+    ease: 'power1.inOut',
+    delay: 0
+  },
+  // 🔒 If user scrolls to the end (or snaps there), lock it
+  onUpdate(self){
+    // If we just reached end, lock immediately
+    if (!state.lockedAtEnd && (self.progress >= 0.999 || self.animation.progress() >= 0.999)) {
+      lockToEnd();
+      return;
     }
-  });
+    // While locked, keep it pinned at the end
+    if(state.lockedAtEnd){
+      self.animation.progress(1);
+      self.scroll(self.end);
+    }
+  },
+  // Extra safety: when ST naturally leaves at the end, lock too
+  onLeave(){
+    if (!state.lockedAtEnd) lockToEnd();
+  }
+});
+
 
   /******************************************************************
    * JUMP TO END ON INPUT FOCUS (fade-out → switch → fade-in)

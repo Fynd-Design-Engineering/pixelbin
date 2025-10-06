@@ -107,6 +107,9 @@
   setPillsDisplay(true);
   setTryImagesDisplay(false);
 
+  // NEW: placeholders default hidden; addButton shown
+  setPlaceholderState('default');
+
   /******************************************************************
    * IMAGE INJECTION HELPERS — COMMENTED OUT (kept to avoid breaking references)
    ******************************************************************/
@@ -174,6 +177,34 @@
     const n = document.querySelector('.pb_try-images');
     if (!n) return;
     gsap.set(n, { display: show ? 'block' : 'none', visibility: show ? 'visible' : 'hidden' });
+  }
+
+  // NEW: Placeholder state manager + reversible tween
+  function setPlaceholderState(mode){
+    const img1 = document.querySelector('.placeholderimage1');
+    const img2 = document.querySelector('.placeholderimage2');
+    const addBtn = document.getElementById('addButton');
+
+    const show = (el) => el && gsap.set(el, { display: 'flex', visibility: 'visible', autoAlpha: 1 });
+    const hide = (el) => el && gsap.set(el, { display: 'none',  visibility: 'hidden', autoAlpha: 0 });
+
+    switch(mode){
+      case 'p2': // Prompt 2
+        show(img1); hide(img2); if (addBtn) hide(addBtn);
+        break;
+      case 'p3': // Prompt 3
+        hide(img1); show(img2); if (addBtn) hide(addBtn);
+        break;
+      default:   // 'default' and 'p1'
+        hide(img1); hide(img2); if (addBtn) show(addBtn);
+    }
+  }
+  function revPlaceholderSwap(prevMode, nextMode){
+    return gsap.to({}, {
+      duration: 0.01,
+      onComplete:        () => setPlaceholderState(nextMode),
+      onReverseComplete: () => setPlaceholderState(prevMode)
+    });
   }
 
   function showBg(n) {
@@ -346,10 +377,10 @@
   function revGen(show){ return gsap.to({}, {duration:0.01,onComplete:()=>setGeneratingVisible(show),onReverseComplete:()=>setGeneratingVisible(!show)}); }
 
   /******************************************************************
-   * SEGMENT BUILDER (restored with input swaps)
+   * SEGMENT BUILDER (restored with input + placeholder swaps)
    ******************************************************************/
   function segmentForPill(pIndex, prevText, nextText, mapping) {
-    const { baseBg, nextBg, headlineAfterInput, image } = mapping || {};
+    const { baseBg, nextBg, headlineAfterInput, image, placeholderAfterInput } = mapping || {};
     const tl = gsap.timeline();
 
     if (pIndex !== 0) {
@@ -366,7 +397,13 @@
 
     // Put the pill text into the input at each step
     tl.add(revInputSwap(prevText,nextText));
-    if (headlineAfterInput?.from && headlineAfterInput?.to) tl.add(revHeadlineStep(headlineAfterInput.from,headlineAfterInput.to));
+    if (placeholderAfterInput?.from && placeholderAfterInput?.to) {
+      // EXACTLY aligned with input swap
+      tl.add(revPlaceholderSwap(placeholderAfterInput.from, placeholderAfterInput.to));
+    }
+    if (headlineAfterInput?.from && headlineAfterInput?.to) {
+      tl.add(revHeadlineStep(headlineAfterInput.from,headlineAfterInput.to));
+    }
 
     // Image swap symmetry — COMMENTED OUT (no injection)
     /*
@@ -405,21 +442,25 @@
 
   master.add(segmentForPill(0, '', pillTexts[0], {
     headlineAfterInput: { from: 'default', to: 'create' },
-    baseBg: 1, nextBg: 2
+    baseBg: 1, nextBg: 2,
+    // p1 behaves like default for placeholders (both hidden, addButton visible)
+    placeholderAfterInput: { from: 'default', to: 'p1' }
   }));
   master.addLabel('seg1End');
 
   master.add(segmentForPill(1, pillTexts[0], pillTexts[1], {
     headlineAfterInput: { from: 'create', to: 'edit' },
     baseBg: 3, nextBg: 4,
-    image: { url: IMG_EDIT } // kept but unused
+    image: { url: IMG_EDIT }, // kept but unused
+    placeholderAfterInput: { from: 'p1', to: 'p2' } // show placeholderimage1 + hide addButton
   }));
   master.addLabel('seg2End');
 
   master.add(segmentForPill(2, pillTexts[1], pillTexts[2], {
     headlineAfterInput: { from: 'edit', to: 'enhance' },
     baseBg: 5, nextBg: 6,
-    image: { clear: true, url: IMG_ENHANCE, prevUrl: IMG_EDIT } // kept but unused
+    image: { clear: true, url: IMG_ENHANCE, prevUrl: IMG_EDIT }, // kept but unused
+    placeholderAfterInput: { from: 'p2', to: 'p3' } // show placeholderimage2 + hide addButton
   }));
   master.addLabel('seg3End');
 
@@ -433,6 +474,8 @@
   }));
   endTl.add(revBgStep(6,1),'<');
   endTl.add(revHeadlineStep('enhance','default'),'<');
+  // Placeholders: p3 -> default (hide both, show addButton)
+  endTl.add(revPlaceholderSwap('p3','default'), '<');
   endTl.add(gsap.to({},{
     duration:0.01,
     onComplete:()=>{ 
@@ -488,49 +531,44 @@
   }
 
   function lockToEnd(){
-  const st = ScrollTrigger.getById('hero');
-  state.lockedAtEnd = true;
-  if (st) {
-    st.animation.progress(1).pause();
-    st.scroll(st.end);
-  }
-}
-
-
-ScrollTrigger.create({
-  id:'hero',
-  animation: master,
-  trigger: WRAPPER_SEL,
-  start: 'top top',
-  end: 'bottom bottom',
-  scrub: 1,
-  pin: PINNED_SEL,
-  anticipatePin: 1,
-  snap: {
-    snapTo: (value) => snapToNearestStep(value),
-    duration: { min: 0.2, max: 0.4 },
-    ease: 'power1.inOut',
-    delay: 0
-  },
-  // 🔒 If user scrolls to the end (or snaps there), lock it
-  onUpdate(self){
-    // If we just reached end, lock immediately
-    if (!state.lockedAtEnd && (self.progress >= 0.999 || self.animation.progress() >= 0.999)) {
-      lockToEnd();
-      return;
+    const st = ScrollTrigger.getById('hero');
+    state.lockedAtEnd = true;
+    if (st) {
+      st.animation.progress(1).pause();
+      st.scroll(st.end);
     }
-    // While locked, keep it pinned at the end
-    if(state.lockedAtEnd){
-      self.animation.progress(1);
-      self.scroll(self.end);
-    }
-  },
-  // Extra safety: when ST naturally leaves at the end, lock too
-  onLeave(){
-    if (!state.lockedAtEnd) lockToEnd();
   }
-});
 
+  ScrollTrigger.create({
+    id:'hero',
+    animation: master,
+    trigger: WRAPPER_SEL,
+    start: 'top top',
+    end: 'bottom bottom',
+    scrub: 1,
+    pin: PINNED_SEL,
+    anticipatePin: 1,
+    snap: {
+      snapTo: (value) => snapToNearestStep(value),
+      duration: { min: 0.2, max: 0.4 },
+      ease: 'power1.inOut',
+      delay: 0
+    },
+    // 🔒 If user scrolls to the end (or snaps there), lock it
+    onUpdate(self){
+      if (!state.lockedAtEnd && (self.progress >= 0.999 || self.animation.progress() >= 0.999)) {
+        lockToEnd();
+        return;
+      }
+      if(state.lockedAtEnd){
+        self.animation.progress(1);
+        self.scroll(self.end);
+      }
+    },
+    onLeave(){
+      if (!state.lockedAtEnd) lockToEnd();
+    }
+  });
 
   /******************************************************************
    * JUMP TO END ON INPUT FOCUS (fade-out → switch → fade-in)
@@ -566,6 +604,10 @@ ScrollTrigger.create({
       setGeneratingVisible(false);
       setRealInputValue(inputEl, '');
       if (inputEl) inputEl.placeholder = TEXT.PLACEHOLDER.final;
+
+      // NEW: default placeholders at end-jump too
+      setPlaceholderState('default');
+
       if (st) st.scroll(st.end);
       master.progress(1).pause();
     });
@@ -592,6 +634,9 @@ ScrollTrigger.create({
     showBg(1);
     setGeneratingVisible(false);
     setHeadline('default',true);
+
+    // NEW: ensure placeholders are default in reduced motion
+    setPlaceholderState('default');
   }
 
   /******************************************************************

@@ -147,8 +147,8 @@ document.addEventListener("DOMContentLoaded", () => {
       textArea?.classList.remove("hidden");
       if (textArea) {
         textArea.value = state.inputValue;
-        const rows = 3 + Math.floor(state.inputValue.length / 80);
-        textArea.rows = Math.max(3, Math.min(8, rows));
+        const rows = 1 + Math.floor(state.inputValue.length / 80);
+        textArea.rows = Math.max(1, Math.min(4, rows));
       }
     } else {
       textInput?.classList.remove("hidden");

@@ -265,117 +265,141 @@ function setNavWhiteMode(on){
 }
 
 
-
+function setPillGlass(on){
+  const sel = '.promt-pill'; // affects all pills
+  if (on) {
+    gsap.set(sel, { background: 'rgba(255, 255, 255, 0.60)' });
+  } else {
+    gsap.set(sel, { clearProps: 'background' }); // back to CSS default
+  }
+}
 
   function showBg(n) {
-    const idx = n - 1;
-    if (!bgEls[idx]) return;
+  const idx = n - 1;
+  if (!bgEls[idx]) return;
 
-    const searchForm     = document.querySelector('.search-form');      // input container glass
-    const charCounter    = document.querySelector('.char-counter');     // new
-    const generateButton = document.querySelector('.generate-button');  // new
+  const searchForm     = document.querySelector('.search-form');      // input container glass
+  const charCounter    = document.querySelector('.char-counter');     // new
+  const generateButton = document.querySelector('.generate-button');  // new
 
-    // Hide others
-    bgEls.forEach((el, i) => {
-      if (i === idx) return;
-      gsap.to(el, {
-        opacity: 0,
-        duration: 0.4,
-        overwrite: true,
-        onComplete: () => {
-          gsap.set(el, { visibility: 'hidden', display: 'none' });
-        }
-      });
-    });
-
-    // Show target
-    gsap.set(bgEls[idx], { display: 'block', visibility: 'visible' });
-    gsap.to(bgEls[idx], {
-      opacity: 1,
+  // Hide others
+  bgEls.forEach((el, i) => {
+    if (i === idx) return;
+    gsap.to(el, {
+      opacity: 0,
       duration: 0.4,
       overwrite: true,
-      onStart: () => {
-        if (!headlineEl || !subHeadlineEl) return;
-
-        // Shared style for .search-form during non-default phases
-        const inputStyle = {
-          backdropFilter: 'blur(100px)',
-          WebkitBackdropFilter: 'blur(100px)',
-          border: '1px solid rgba(255, 255, 255, 1)',
-          background: 'rgba(255, 255, 255, 0.3)',
-          color: '#ffffff',
-          boxShadow: `
-            0px 2px 5px 0px rgba(47, 40, 53, 0.15),
-            0px 10px 10px 0px rgba(47, 40, 53, 0.13),
-            0px 21px 13px 0px rgba(47, 40, 53, 0.08),
-            0px 38px 15px 0px rgba(47, 40, 53, 0.02),
-            0px 60px 17px 0px rgba(47, 40, 53, 0)
-          `
-        };
-
-        // Additional synced styles (requested)
-        const activeTextColor = '#ffffff'; // for .text-input and .char-counter
-        const activeBtn = { background: '#ffffff', color: '#000000' };
-
-        // Phase-specific logic (colors + search-form + new elements + NAV)
-        if (n === 2) {
-          headlineEl.style.color    = HEADLINE_COLORS.Create;
-          subHeadlineEl.style.color = SUBHEAD_COLORS.Create;
-
-          setNavWhiteMode(true); // invert nav
-
-          if (searchForm) gsap.set(searchForm, inputStyle);
-          if (inputEl)   inputEl.style.color = activeTextColor;
-          if (charCounter) gsap.set(charCounter, { color: activeTextColor });
-          if (generateButton) gsap.set(generateButton, activeBtn);
-
-        } else if (n === 4) {
-          headlineEl.style.color    = HEADLINE_COLORS.Edit;
-          subHeadlineEl.style.color = SUBHEAD_COLORS.Edit;
-
-          setNavWhiteMode(true); // invert nav
-
-          if (searchForm) gsap.set(searchForm, inputStyle);
-          if (inputEl)   inputEl.style.color = activeTextColor;
-          if (charCounter) gsap.set(charCounter, { color: activeTextColor });
-          if (generateButton) gsap.set(generateButton, activeBtn);
-
-        } else if (n === 6) {
-          headlineEl.style.color    = HEADLINE_COLORS.Enhance;
-          subHeadlineEl.style.color = SUBHEAD_COLORS.Enhance;
-
-          setNavWhiteMode(true); // invert nav
-
-          if (searchForm) gsap.set(searchForm, inputStyle);
-          if (inputEl)   inputEl.style.color = activeTextColor;
-          if (charCounter) gsap.set(charCounter, { color: activeTextColor });
-          if (generateButton) gsap.set(generateButton, activeBtn);
-
-        } else if (n === 1) {
-          headlineEl.style.color    = HEADLINE_COLORS.Default;
-          subHeadlineEl.style.color = SUBHEAD_COLORS.Default;
-
-          setNavWhiteMode(false); // restore nav
-
-          // Reset styles we touched (only those props)
-          if (searchForm) gsap.set(searchForm, { clearProps: 'all' });
-          if (inputEl)    inputEl.style.color = ''; // revert to CSS default
-          if (charCounter) gsap.set(charCounter, { clearProps: 'color' });
-          if (generateButton) gsap.set(generateButton, { clearProps: 'background,color' });
-
-          if (marqueeWrapper) {
-            if (state.allowMarquee) {
-              gsap.to(marqueeWrapper, { autoAlpha: 1, duration: 0.5 });
-            } else {
-              gsap.set(marqueeWrapper, { autoAlpha: 0 });
-            }
-          }
-        } else {
-          if (marqueeWrapper) gsap.set(marqueeWrapper, { autoAlpha: 0 });
-        }
+      onComplete: () => {
+        gsap.set(el, { visibility: 'hidden', display: 'none' });
       }
     });
+  });
+
+  // Show target
+  gsap.set(bgEls[idx], { display: 'block', visibility: 'visible' });
+  gsap.to(bgEls[idx], {
+    opacity: 1,
+    duration: 0.4,
+    overwrite: true,
+    onStart: () => {
+      if (!headlineEl || !subHeadlineEl) return;
+
+      // Shared style for .search-form during non-default phases
+      const inputStyle = {
+        backdropFilter: 'blur(100px)',
+        WebkitBackdropFilter: 'blur(100px)',
+        border: '1px solid rgba(255, 255, 255, 1)',
+        background: 'rgba(255, 255, 255, 0.3)',
+        color: '#ffffff',
+        boxShadow: `
+          0px 2px 5px 0px rgba(47, 40, 53, 0.15),
+          0px 10px 10px 0px rgba(47, 40, 53, 0.13),
+          0px 21px 13px 0px rgba(47, 40, 53, 0.08),
+          0px 38px 15px 0px rgba(47, 40, 53, 0.02),
+          0px 60px 17px 0px rgba(47, 40, 53, 0)
+        `
+      };
+
+      // Additional synced styles (requested)
+      const activeTextColor = '#ffffff'; // for .text-input and .char-counter
+      const activeBtn = { background: '#ffffff', color: '#000000' };
+
+      // Phase-specific logic (colors + search-form + new elements + NAV + PILL BG)
+      if (n === 2) {
+        headlineEl.style.color    = HEADLINE_COLORS.Create;
+        subHeadlineEl.style.color = SUBHEAD_COLORS.Create;
+
+        setNavWhiteMode(true); // invert nav
+
+        if (searchForm) gsap.set(searchForm, inputStyle);
+        if (inputEl)   inputEl.style.color = activeTextColor;
+        if (charCounter) gsap.set(charCounter, { color: activeTextColor });
+        if (generateButton) gsap.set(generateButton, activeBtn);
+
+        // NEW: make pills glassy white in sync
+        setPillGlass(true);
+
+      } else if (n === 4) {
+        headlineEl.style.color    = HEADLINE_COLORS.Edit;
+        subHeadlineEl.style.color = SUBHEAD_COLORS.Edit;
+
+        setNavWhiteMode(true); // invert nav
+
+        if (searchForm) gsap.set(searchForm, inputStyle);
+        if (inputEl)   inputEl.style.color = activeTextColor;
+        if (charCounter) gsap.set(charCounter, { color: activeTextColor });
+        if (generateButton) gsap.set(generateButton, activeBtn);
+
+        // NEW
+        setPillGlass(true);
+
+      } else if (n === 6) {
+        headlineEl.style.color    = HEADLINE_COLORS.Enhance;
+        subHeadlineEl.style.color = SUBHEAD_COLORS.Enhance;
+
+        setNavWhiteMode(true); // invert nav
+
+        if (searchForm) gsap.set(searchForm, inputStyle);
+        if (inputEl)   inputEl.style.color = activeTextColor;
+        if (charCounter) gsap.set(charCounter, { color: activeTextColor });
+        if (generateButton) gsap.set(generateButton, activeBtn);
+
+        // NEW
+        setPillGlass(true);
+
+      } else if (n === 1) {
+        // Back to default palette
+        headlineEl.style.color    = HEADLINE_COLORS.Default;
+        subHeadlineEl.style.color = SUBHEAD_COLORS.Default;
+
+        setNavWhiteMode(false); // restore nav
+
+        // Reset styles we touched (only those props)
+        if (searchForm) gsap.set(searchForm, { clearProps: 'all' });
+        if (inputEl)    inputEl.style.color = ''; // revert to CSS default
+        if (charCounter) gsap.set(charCounter, { clearProps: 'color' });
+        if (generateButton) gsap.set(generateButton, { clearProps: 'background,color' });
+
+        // NEW: restore pill backgrounds to their CSS default
+        setPillGlass(false);
+
+       if (marqueeWrapper) {
+  if (state.allowMarquee) {
+    gsap.set(marqueeWrapper, { autoAlpha: 1 });
+  } else {
+    gsap.set(marqueeWrapper, { autoAlpha: 0 });
   }
+}
+
+      } else {
+        // Transitional scenes (e.g., 3 and 5) keep marquee hidden
+        if (marqueeWrapper) gsap.set(marqueeWrapper, { autoAlpha: 0 });
+        // Do NOT change pill bg here so it only flips when the search container does
+      }
+    }
+  });
+}
+
 
   function setHeadline(stageKey, instant = false) {
     const nextH = TEXT.HEADLINE[stageKey] ?? TEXT.HEADLINE.default;
@@ -573,7 +597,12 @@ function setNavWhiteMode(on){
     onComplete: () => { setPillsDisplay(false); setTryImagesDisplay(true); },     // END: show try-images
     onReverseComplete: () => { setTryImagesDisplay(false); setPillsDisplay(true); } // REVERSE: back to Start
   }));
-  endTl.to(inputEl,{yPercent:0,autoAlpha:1,duration:0.01,ease:'none'});
+  endTl.add(() => {
+  // keep the third prompt text visible until it’s replaced
+  if (inputEl) {
+    gsap.set(inputEl, { autoAlpha: 1, yPercent: 0 }); // ensure visible
+  }
+});
   master.add(endTl);
   master.addLabel('end');
 
@@ -712,96 +741,5 @@ function setNavWhiteMode(on){
     setPlaceholderState('default');
   }
 
-  /******************************************************************
-   * INTERACTION LOGGING (no logic changes)
-   ******************************************************************/
-  (function setupInteractionLogging(){
-    const ROOT = document.querySelector(WRAPPER_SEL) || document;
-
-    // --- tiny helpers
-    const LOG_EVENT = 'HERO_INTERACTION';
-    const selPath = (el) => {
-      if (!el || el === document || el === window) return String(el);
-      const parts = [];
-      let node = el;
-      while (node && node.nodeType === 1 && parts.length < 5) {
-        let s = node.nodeName.toLowerCase();
-        if (node.id) s += `#${node.id}`;
-        if (node.classList && node.classList.length) s += '.' + Array.from(node.classList).slice(0,3).join('.');
-        parts.unshift(s);
-        node = node.parentElement;
-      }
-      return parts.join(' > ');
-    };
-    const emit = (name, extra={}) => {
-      const payload = {
-        ts: Date.now(),
-        event: name,
-        target: selPath(extra.el || extra.targetEl),
-        ...extra
-      };
-      // Console
-      //try { console.log('[HERO_LOG]', payload); } catch(_) {}
-      // GTM/GA dataLayer
-      try { window.dataLayer && window.dataLayer.push({ event: LOG_EVENT, name, ...payload }); } catch(_) {}
-      // Custom analytics
-      try { window.__ANALYTICS?.track && window.__ANALYTICS.track(name, payload); } catch(_) {}
-    };
-
-    // --- generic container listeners (capture phase to catch deep targets)
-    ROOT.addEventListener('click',       (e)=>emit('click',       { el:e.target }), true);
-    ROOT.addEventListener('pointerdown', (e)=>emit('pointerdown', { el:e.target }), true);
-    ROOT.addEventListener('pointerup',   (e)=>emit('pointerup',   { el:e.target }), true);
-    ROOT.addEventListener('mouseenter',  (e)=>emit('hover_in',    { el:e.target }), true);
-    ROOT.addEventListener('mouseleave',  (e)=>emit('hover_out',   { el:e.target }), true);
-
-    // --- input field specifics
-    if (inputEl) {
-      inputEl.addEventListener('focus',   (e)=>emit('input_focus',   { el:e.target }), { passive:true });
-      inputEl.addEventListener('blur',    (e)=>emit('input_blur',    { el:e.target }), { passive:true });
-      inputEl.addEventListener('input',   (e)=>emit('input_change',  { el:e.target, value: e.target.value }));
-      inputEl.addEventListener('change',  (e)=>emit('input_commit',  { el:e.target, value: e.target.value }));
-      inputEl.addEventListener('keydown', (e)=>{
-        if (e.key === 'Enter') emit('input_enter', { el:e.target, value: e.target.value });
-      });
-    }
-
-    // --- pill interactions
-    pills.forEach((pill, i)=>{
-      pill && pill.addEventListener('click', (e)=>emit('pill_click', {
-        el:e.currentTarget,
-        index:i,
-        text:pillTexts[i] || ''
-      }));
-      pill && pill.addEventListener('mouseenter', (e)=>emit('pill_hover', { el:e.currentTarget, index:i }));
-    });
-
-    // --- buttons inside wrapper
-    ROOT.querySelectorAll('button').forEach(btn=>{
-      btn.addEventListener('click', (e)=>emit('button_click', {
-        el:e.currentTarget,
-        label: (btn.getAttribute('aria-label') || btn.textContent || '').trim()
-      }));
-    });
-
-    // --- file upload + drag/drop
-    const fi = document.getElementById('fileInput');
-    if (fi) {
-      fi.addEventListener('change', (e)=>{
-        const f = e.target.files && e.target.files[0];
-        emit('file_change', { el:e.target, fileName: f?.name, fileType: f?.type, fileSize: f?.size });
-      });
-      fi.addEventListener('click', (e)=>emit('file_click', { el:e.target }));
-    }
-    ROOT.addEventListener('dragover', (e)=>{ emit('drag_over', { el:e.target }); }, true);
-    ROOT.addEventListener('drop',     (e)=>{
-      const f = e.dataTransfer?.files && e.dataTransfer.files[0];
-      emit('drop', { el:e.target, fileName: f?.name, fileType: f?.type, fileSize: f?.size });
-    }, true);
-  })();
-
-  /******************************************************************
-   * UTILS
-   ******************************************************************/
-  // (duplicate suffixNum removed intentionally)
+  
 })();

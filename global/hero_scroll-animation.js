@@ -27,7 +27,7 @@
       'Contemplative astronaut in cave, glowing crystals, cosmic wonder',
       'Show an asian model holding this bottle',
       'Change the background to vibrant seaside sunset view',
-      'Upscale this image to 4K, sharper, detailed, ultra-real'
+      'Remove the sofa and table from this image'
     ],
   };
 

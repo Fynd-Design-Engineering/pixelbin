@@ -39,6 +39,7 @@
 
   const headlineEl     = document.querySelector('.hero-header_component .u-text-style-displayl');
   const subHeadlineEl  = document.querySelector('.hero-header_para-wrapper .u-text-style-l');
+  const pageTitleEl    = document.querySelector('.page-title');
   const inputEl        = document.querySelector('input#textInput.text-input');
   const marqueeWrapper = document.querySelector('.marquee-wrapper');
   const genOverlay     = document.querySelector('.generating');
@@ -70,9 +71,14 @@
 
   let origHeadlineColor    = headlineEl ? getComputedStyle(headlineEl).color : '';
   let origSubHeadlineColor = subHeadlineEl ? getComputedStyle(subHeadlineEl).color : '';
+  let origPageTitleColor   = pageTitleEl ? getComputedStyle(pageTitleEl).color : '';
   
   const HEADLINE_COLORS = { 
     Default: origHeadlineColor, 
+    White: '#ffffff'
+  };
+  const PAGETITLE_COLORS = {
+    Default: origPageTitleColor,
     White: '#ffffff'
   };
 
@@ -100,20 +106,23 @@
     subHeadlineEl.textContent = TEXT.SUBHEAD.start;
     subHeadlineEl.style.color = HEADLINE_COLORS.White;
   }
+  if (pageTitleEl) {
+    pageTitleEl.style.color = PAGETITLE_COLORS.White; // Start with white, don't change text
+  }
 
   if (marqueeWrapper) gsap.set(marqueeWrapper, { autoAlpha: 0 });
   if (genOverlay) gsap.set(genOverlay, { display: 'none', visibility: 'hidden', autoAlpha: 0 });
-  if (scrollMore) gsap.set(scrollMore, { autoAlpha: 1 }); // Visible at start
+  if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 }); // Make visible at start
   
   if (inputEl) {
-    inputEl.value = TEXT.PROMPTS[0];
+    inputEl.value = TEXT.PROMPTS[0]; // First prompt: "Contemplative astronaut..."
     inputEl.setAttribute('value', TEXT.PROMPTS[0]);
     inputEl.placeholder = '';
   }
 
   setPillsDisplay(true);
   setTryImagesDisplay(false);
-  setPlaceholderState('default');
+  setPlaceholderState('default'); // START with NO thumbnail, addButton visible
   setNavWhiteMode(true);
   setPillGlass(true);
   applyWhiteInputStyle();
@@ -297,6 +306,10 @@
     if (subHeadlineEl) {
       subHeadlineEl.style.color = color;
     }
+    // Update page-title color to match (but don't change text)
+    if (pageTitleEl) {
+      pageTitleEl.style.color = color;
+    }
   }
 
   function setRealInputValue(el, text) {
@@ -309,39 +322,41 @@
   }
 
   /******************************************************************
-   * MASTER TIMELINE - FLUID ANIMATIONS
+   * MASTER TIMELINE - FLUID ANIMATIONS WITH IMMEDIATE FEEDBACK
    ******************************************************************/
   const master = gsap.timeline({ paused: true });
 
   // Prepare all backgrounds to be visible for crossfading
   prepareAllBgs();
 
-  // PILL 1 JOURNEY - FLUID MOVEMENTS
-  // Scroll 1-2: Pill 1 moves up and exits (ANIMATED - user sees movement)
-  master.to(pills[0], { ...SLOTS[0], duration: 1, ease: 'none' });
-  if (pills[1]) master.to(pills[1], { ...SLOTS[1], duration: 1, ease: 'none' }, '<');
-  if (pills[2]) master.to(pills[2], { ...SLOTS[2], duration: 1, ease: 'none' }, '<');
-  
-  master.to(pills[0], { yPercent: -120, autoAlpha: 0, duration: 1, ease: 'none' });
-  if (pills[1]) master.to(pills[1], { ...SLOTS[0], duration: 1, ease: 'none' }, '<');
-  if (pills[2]) master.to(pills[2], { ...SLOTS[1], duration: 1, ease: 'none' }, '<');
+  // PILL 1 JOURNEY - Moves and exits smoothly
+  master.to(pills[0], { yPercent: -120, autoAlpha: 0, duration: 2, ease: 'none' });
+  if (pills[1]) master.to(pills[1], { ...SLOTS[0], duration: 2, ease: 'none' }, '<');
+  if (pills[2]) master.to(pills[2], { ...SLOTS[1], duration: 2, ease: 'none' }, '<');
 
-  // Scroll 3: Text changes + thumbnail 1 shows (INSTANT snap point)
-  master.add(() => {
-    setRealInputValue(inputEl, TEXT.PROMPTS[1]);
-    setPlaceholderState('p1');
-  });
+  // Text changes to prompt 2 + thumbnail changes from default to p1
+  master.add(gsap.to({}, {
+    duration: 0.01,
+    onComplete: () => {
+      setRealInputValue(inputEl, TEXT.PROMPTS[1]);
+      setPlaceholderState('p1');
+    },
+    onReverseComplete: () => {
+      setRealInputValue(inputEl, TEXT.PROMPTS[0]);
+      setPlaceholderState('default');
+    }
+  }));
 
-  // Scroll 4: Background crossfade bg0 → bg1 (ANIMATED - user sees fade)
-  master.to(bgEls[0], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[1], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  // Background crossfade bg0 → bg1 (ANIMATED)
+  master.to(bgEls[0], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[1], { opacity: 1, duration: 2, ease: 'none' }, '<');
 
-  // Scroll 5: Generating shows (ANIMATED - user sees fade in)
+  // Generating shows (ANIMATED)
   master.to(genOverlay, { 
     display: 'block',
     visibility: 'visible',
     autoAlpha: 1, 
-    duration: 0.8, 
+    duration: 1, 
     ease: 'none',
     onStart: () => {
       if (genOverlay) {
@@ -351,12 +366,12 @@
     }
   });
 
-  // Scroll 6: bg1 → bg2, generating hides (ANIMATED crossfade)
-  master.to(bgEls[1], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[2], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  // bg1 → bg2, generating hides (ANIMATED crossfade)
+  master.to(bgEls[1], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[2], { opacity: 1, duration: 2, ease: 'none' }, '<');
   master.to(genOverlay, { 
     autoAlpha: 0, 
-    duration: 0.8, 
+    duration: 1, 
     ease: 'none',
     onComplete: () => {
       if (genOverlay) {
@@ -368,28 +383,35 @@
   
   master.addLabel('pill1End');
 
-  // PILL 2 JOURNEY - FLUID MOVEMENTS
-  // Scroll 7: Pill 2 exits (ANIMATED)
-  master.to(pills[1], { yPercent: -120, autoAlpha: 0, duration: 1, ease: 'none' });
-  if (pills[2]) master.to(pills[2], { ...SLOTS[0], duration: 1, ease: 'none' }, '<');
+  // PILL 2 JOURNEY
+  master.to(pills[1], { yPercent: -120, autoAlpha: 0, duration: 2, ease: 'none' });
+  if (pills[2]) master.to(pills[2], { ...SLOTS[0], duration: 2, ease: 'none' }, '<');
 
-  // Scroll 8: Text + headline + thumbnail changes (INSTANT snap point)
-  master.add(() => {
-    setRealInputValue(inputEl, TEXT.PROMPTS[2]);
-    setHeadline(TEXT.HEADLINE.edit, HEADLINE_COLORS.White);
-    setPlaceholderState('p2');
-  });
+  // Text + headline + thumbnail changes
+  master.add(gsap.to({}, {
+    duration: 0.01,
+    onComplete: () => {
+      setRealInputValue(inputEl, TEXT.PROMPTS[2]);
+      setHeadline(TEXT.HEADLINE.edit, HEADLINE_COLORS.White);
+      setPlaceholderState('p2');
+    },
+    onReverseComplete: () => {
+      setRealInputValue(inputEl, TEXT.PROMPTS[1]);
+      setHeadline(TEXT.HEADLINE.create, HEADLINE_COLORS.White);
+      setPlaceholderState('p1');
+    }
+  }));
 
-  // Scroll 9: Background bg2 → bg3 (ANIMATED crossfade)
-  master.to(bgEls[2], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[3], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  // Background bg2 → bg3 (ANIMATED crossfade)
+  master.to(bgEls[2], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[3], { opacity: 1, duration: 2, ease: 'none' }, '<');
 
-  // Scroll 10: Generating shows (ANIMATED)
+  // Generating shows (ANIMATED)
   master.to(genOverlay, { 
     display: 'block',
     visibility: 'visible',
     autoAlpha: 1, 
-    duration: 0.8, 
+    duration: 1, 
     ease: 'none',
     onStart: () => {
       if (genOverlay) {
@@ -399,12 +421,12 @@
     }
   });
 
-  // Scroll 11: bg3 → bg4, generating hides (ANIMATED)
-  master.to(bgEls[3], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[4], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  // bg3 → bg4, generating hides (ANIMATED)
+  master.to(bgEls[3], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[4], { opacity: 1, duration: 2, ease: 'none' }, '<');
   master.to(genOverlay, { 
     autoAlpha: 0, 
-    duration: 0.8, 
+    duration: 1, 
     ease: 'none',
     onComplete: () => {
       if (genOverlay) {
@@ -416,27 +438,34 @@
   
   master.addLabel('pill2End');
 
-  // PILL 3 JOURNEY - FLUID MOVEMENTS
-  // Scroll 12: Pill 3 exits (ANIMATED)
-  master.to(pills[2], { yPercent: -120, autoAlpha: 0, duration: 1, ease: 'none' });
+  // PILL 3 JOURNEY
+  master.to(pills[2], { yPercent: -120, autoAlpha: 0, duration: 2, ease: 'none' });
 
-  // Scroll 13: Text + headline + thumbnail changes (INSTANT snap point)
-  master.add(() => {
-    setRealInputValue(inputEl, TEXT.PROMPTS[3]);
-    setHeadline(TEXT.HEADLINE.enhance, HEADLINE_COLORS.White);
-    setPlaceholderState('p3');
-  });
+  // Text + headline + thumbnail changes
+  master.add(gsap.to({}, {
+    duration: 0.01,
+    onComplete: () => {
+      setRealInputValue(inputEl, TEXT.PROMPTS[3]);
+      setHeadline(TEXT.HEADLINE.enhance, HEADLINE_COLORS.White);
+      setPlaceholderState('p3');
+    },
+    onReverseComplete: () => {
+      setRealInputValue(inputEl, TEXT.PROMPTS[2]);
+      setHeadline(TEXT.HEADLINE.edit, HEADLINE_COLORS.White);
+      setPlaceholderState('p2');
+    }
+  }));
 
-  // Scroll 14: Background bg4 → bg5 (ANIMATED crossfade)
-  master.to(bgEls[4], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[5], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  // Background bg4 → bg5 (ANIMATED crossfade)
+  master.to(bgEls[4], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[5], { opacity: 1, duration: 2, ease: 'none' }, '<');
 
-  // Scroll 15: Generating shows (ANIMATED)
+  // Generating shows (ANIMATED)
   master.to(genOverlay, { 
     display: 'block',
     visibility: 'visible',
     autoAlpha: 1, 
-    duration: 0.8, 
+    duration: 1, 
     ease: 'none',
     onStart: () => {
       if (genOverlay) {
@@ -446,12 +475,12 @@
     }
   });
 
-  // Scroll 16: bg5 → bg6, generating hides (ANIMATED)
-  master.to(bgEls[5], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[6], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  // bg5 → bg6, generating hides (ANIMATED)
+  master.to(bgEls[5], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[6], { opacity: 1, duration: 2, ease: 'none' }, '<');
   master.to(genOverlay, { 
     autoAlpha: 0, 
-    duration: 0.8, 
+    duration: 1, 
     ease: 'none',
     onComplete: () => {
       if (genOverlay) {
@@ -465,33 +494,47 @@
 
   // END STAGE - FLUID TRANSITION
   // Input fades out (ANIMATED)
-  master.to(inputEl, { autoAlpha: 0, duration: 0.8, ease: 'none' });
+  master.to(inputEl, { autoAlpha: 0, duration: 1, ease: 'none' });
   
-  // Style changes (INSTANT snap point)
-  master.add(() => {
-    setHeadline(TEXT.HEADLINE.end, HEADLINE_COLORS.Default);
-    setNavWhiteMode(false);
-    removeWhiteInputStyle();
-    setPillGlass(false);
-    setPlaceholderState('default');
-    state.allowMarquee = true;
-    setRealInputValue(inputEl, '');
-    if (inputEl) inputEl.placeholder = TEXT.PLACEHOLDER.final;
-    setPillsDisplay(false);
-    setTryImagesDisplay(true);
-    
-    // Hide scroll-more indicator at end
-    if (scrollMore) gsap.set(scrollMore, { autoAlpha: 0 });
-  });
+  // Style changes
+  master.add(gsap.to({}, {
+    duration: 0.01,
+    onComplete: () => {
+      setHeadline(TEXT.HEADLINE.end, HEADLINE_COLORS.Default);
+      setNavWhiteMode(false);
+      removeWhiteInputStyle();
+      setPillGlass(false);
+      setPlaceholderState('default');
+      state.allowMarquee = true;
+      setRealInputValue(inputEl, '');
+      if (inputEl) inputEl.placeholder = TEXT.PLACEHOLDER.final;
+      setPillsDisplay(false);
+      setTryImagesDisplay(true);
+      if (scrollMore) gsap.set(scrollMore, { display: 'none', visibility: 'hidden', autoAlpha: 0 });
+    },
+    onReverseComplete: () => {
+      setHeadline(TEXT.HEADLINE.enhance, HEADLINE_COLORS.White);
+      setNavWhiteMode(true);
+      applyWhiteInputStyle();
+      setPillGlass(true);
+      setPlaceholderState('p3');
+      state.allowMarquee = false;
+      setRealInputValue(inputEl, TEXT.PROMPTS[3]);
+      if (inputEl) inputEl.placeholder = '';
+      setPillsDisplay(true);
+      setTryImagesDisplay(false);
+      if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 });
+    }
+  }));
 
   // Background bg6 → bg7 (ANIMATED crossfade)
-  master.to(bgEls[6], { opacity: 0, duration: 1.5, ease: 'none' });
-  master.to(bgEls[7], { opacity: 1, duration: 1.5, ease: 'none' }, '<');
+  master.to(bgEls[6], { opacity: 0, duration: 2, ease: 'none' });
+  master.to(bgEls[7], { opacity: 1, duration: 2, ease: 'none' }, '<');
   
   // Input fades back in + marquee (ANIMATED)
-  master.to(inputEl, { autoAlpha: 1, duration: 0.8, ease: 'none' });
+  master.to(inputEl, { autoAlpha: 1, duration: 1, ease: 'none' });
   if (marqueeWrapper) {
-    master.to(marqueeWrapper, { autoAlpha: 1, duration: 1, ease: 'none' }, '<');
+    master.to(marqueeWrapper, { autoAlpha: 1, duration: 1.5, ease: 'none' }, '<');
   }
   
   master.addLabel('end');
@@ -504,6 +547,7 @@
     state.lockedAtEnd = true;
     if (st) {
       st.animation.progress(1).pause();
+      // Keep pinned and force scroll to stay at end
       st.scroll(st.end);
     }
   }
@@ -514,18 +558,21 @@
     trigger: WRAPPER_SEL,
     start: 'top top',
     end: 'bottom bottom',
-    scrub: 0.5, // Smooth scrub - animations follow scroll immediately
+    scrub: 0.5,
     pin: PINNED_SEL,
     anticipatePin: 1,
-    // NO SNAP - pure fluid scroll
     onUpdate(self) {
-      if (!state.lockedAtEnd && (self.progress >= 0.999 || self.animation.progress() >= 0.999)) {
-        lockToEnd();
+      // If locked, don't allow scrolling back up - keep at end
+      if (state.lockedAtEnd) {
+        if (self.progress < 0.999) {
+          self.scroll(self.end);
+        }
         return;
       }
-      if (state.lockedAtEnd) {
-        self.animation.progress(1);
-        self.scroll(self.end);
+      
+      // Check if we've reached the end
+      if (self.progress >= 0.999 || self.animation.progress() >= 0.999) {
+        lockToEnd();
       }
     },
     onLeave() {
@@ -539,12 +586,17 @@
   function fadeJumpToEnd() {
     if (state.lockedAtEnd) return;
 
+    // Capture current input value BEFORE jumping
+    const currentInputValue = inputEl ? inputEl.value : '';
+
     const st = ScrollTrigger.getById('hero');
     const tl = gsap.timeline({
       defaults: { ease: 'power2.out' },
       onComplete: () => {
         state.lockedAtEnd = true;
-        if (st) st.scroll(st.end);
+        if (st) {
+          st.scroll(st.end);
+        }
         master.progress(1).pause();
       }
     });
@@ -574,11 +626,11 @@
         genOverlay.style.visibility = 'hidden';
       }
       
-      // Hide scroll-more indicator at end
-      if (scrollMore) gsap.set(scrollMore, { autoAlpha: 0 });
+      if (scrollMore) gsap.set(scrollMore, { display: 'none', visibility: 'hidden', autoAlpha: 0 });
       
-      setRealInputValue(inputEl, '');
-      if (inputEl) inputEl.placeholder = TEXT.PLACEHOLDER.final;
+      // KEEP the current prompt text (don't clear it!)
+      setRealInputValue(inputEl, currentInputValue);
+      if (inputEl) inputEl.placeholder = currentInputValue ? '' : TEXT.PLACEHOLDER.final;
       
       if (st) st.scroll(st.end);
       master.progress(1).pause();
@@ -593,6 +645,11 @@
     inputEl.addEventListener('pointerdown', fadeJumpToEnd, { passive: true });
   }
 
+  const addButton = document.getElementById('addButton');
+  if (addButton) {
+    addButton.addEventListener('click', fadeJumpToEnd, { passive: true });
+  }
+
   /******************************************************************
    * REDUCED MOTION
    ******************************************************************/
@@ -602,13 +659,14 @@
     gsap.set('.anaimtion-promt-pill', { autoAlpha: 1, display: 'flex', visibility: 'visible' });
     setTryImagesDisplay(false);
     gsap.set(marqueeWrapper, { autoAlpha: 1 });
+    if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 }); // Visible in reduced motion
     bgEls.forEach((bg, i) => gsap.set(bg, { opacity: i === 0 ? 1 : 0 }));
     if (genOverlay) {
       genOverlay.style.display = 'none';
       genOverlay.style.visibility = 'hidden';
     }
     setHeadline(TEXT.HEADLINE.start, HEADLINE_COLORS.White);
-    setPlaceholderState('default');
+    setPlaceholderState('default'); // START with addButton visible, no thumbnails
     setNavWhiteMode(true);
     applyWhiteInputStyle();
     setPillGlass(true);

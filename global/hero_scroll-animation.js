@@ -65,8 +65,8 @@
    ******************************************************************/
   const SLOTS = [
     { y: 0,  scale: 1.0, opacity: 1.0 },
-    { y: 32, scale: 0.8, opacity: 0.8 },
-    { y: 56, scale: 0.7, opacity: 0.6 }
+    { y: 32, scale: 0.92, opacity: 0.85 },
+    { y: 56, scale: 0.85, opacity: 0.7 }
   ];
 
   let origHeadlineColor    = headlineEl ? getComputedStyle(headlineEl).color : '';
@@ -85,18 +85,71 @@
   const state = { allowMarquee: false, lockedAtEnd: false };
 
   /******************************************************************
-   * INITIAL STATE - START at bg0 with white styling
+   * PREMIUM ENHANCEMENTS SETUP
+   ******************************************************************/
+  function setupPremiumEffects() {
+    bgEls.forEach((bg, i) => {
+      if (!bg) return;
+      
+      gsap.set(bg, {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        display: 'block',
+        visibility: 'visible',
+        transformOrigin: 'center center'
+      });
+      
+      if (i === 0) {
+        gsap.set(bg, { 
+          opacity: 1, 
+          zIndex: -10,
+          scale: 1,
+          filter: 'blur(0px)'
+        });
+      } 
+      else if (i === 1 || i === 3 || i === 5) {
+        gsap.set(bg, { 
+          opacity: 1, 
+          zIndex: -9,
+          scale: 1.1,
+          clipPath: 'circle(0% at 50% 50%)',
+          webkitClipPath: 'circle(0% at 50% 50%)',
+          filter: 'blur(0px)'
+        });
+      } 
+      else {
+        gsap.set(bg, { 
+          opacity: 0, 
+          zIndex: -8,
+          scale: 1,
+          filter: 'blur(0px)'
+        });
+      }
+    });
+
+    if (scrollMore) {
+      gsap.to(scrollMore, {
+        y: 10,
+        opacity: 0.6,
+        duration: 1.5,
+        ease: 'power1.inOut',
+        repeat: -1,
+        yoyo: true
+      });
+    }
+  }
+
+  /******************************************************************
+   * INITIAL STATE
    ******************************************************************/
   gsap.set(pills[0], SLOTS[0]);
   gsap.set(pills[1], SLOTS[1]);
   gsap.set(pills[2], SLOTS[2]);
 
-  // Start with bg0 visible
-  bgEls.forEach((bg, i) => gsap.set(bg, {
-    opacity: i === 0 ? 1 : 0,
-    visibility: i === 0 ? 'visible' : 'hidden',
-    display: i === 0 ? 'block' : 'none'
-  }));
+  setupPremiumEffects();
 
   if (headlineEl) {
     headlineEl.textContent = TEXT.HEADLINE.start;
@@ -107,22 +160,22 @@
     subHeadlineEl.style.color = HEADLINE_COLORS.White;
   }
   if (pageTitleEl) {
-    pageTitleEl.style.color = PAGETITLE_COLORS.White; // Start with white, don't change text
+    pageTitleEl.style.color = PAGETITLE_COLORS.White;
   }
 
   if (marqueeWrapper) gsap.set(marqueeWrapper, { autoAlpha: 0 });
   if (genOverlay) gsap.set(genOverlay, { display: 'none', visibility: 'hidden', autoAlpha: 0 });
-  if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 }); // Make visible at start
+  if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 });
   
   if (inputEl) {
-    inputEl.value = TEXT.PROMPTS[0]; // First prompt: "Contemplative astronaut..."
+    inputEl.value = TEXT.PROMPTS[0];
     inputEl.setAttribute('value', TEXT.PROMPTS[0]);
     inputEl.placeholder = '';
   }
 
   setPillsDisplay(true);
   setTryImagesDisplay(false);
-  setPlaceholderState('default'); // START with NO thumbnail, addButton visible
+  setPlaceholderState('default');
   setNavWhiteMode(true);
   setPillGlass(true);
   applyWhiteInputStyle();
@@ -192,6 +245,11 @@
     .nav_component.nav-white-mode .nav_dashboard_btn:focus,
     .nav_component.nav-white-mode .nav_dashboard_btn:active {
       color: #ffffff !important;
+      transition: color 0.3s ease, opacity 0.3s ease !important;
+    }
+    .nav_component.nav-white-mode .nav_menu-link:hover,
+    .nav_component.nav-white-mode .nav_dropdown-component:hover {
+      opacity: 0.8 !important;
     }
     .nav_component.nav-white-mode .is-nav-button,
     .nav_component.nav-white-mode .is-nav-button:hover,
@@ -201,9 +259,15 @@
     .nav_component.nav-white-mode .nav_dashboard_btn:hover,
     .nav_component.nav-white-mode .nav_dashboard_btn:focus,
     .nav_component.nav-white-mode .nav_dashboard_btn:active {
-      border-color: currentColor !important;
-      background-color: transparent !important;
-      outline-color: currentColor !important;
+      border-color: rgba(255, 255, 255, 0.3) !important;
+      background-color: rgba(255, 255, 255, 0.1) !important;
+      backdrop-filter: blur(10px) !important;
+      transition: all 0.3s ease !important;
+    }
+    .nav_component.nav-white-mode .is-nav-button:hover,
+    .nav_component.nav-white-mode .nav_dashboard_btn:hover {
+      background-color: rgba(255, 255, 255, 0.2) !important;
+      border-color: rgba(255, 255, 255, 0.5) !important;
     }
     .nav_component.nav-white-mode .nav_dashboard_btn svg,
     .nav_component.nav-white-mode .nav_dashboard_btn:hover svg,
@@ -220,6 +284,7 @@
       fill: #ffffff !important;
       stroke: #ffffff !important;
       color: #ffffff !important;
+      transition: opacity 0.3s ease !important;
     }`;
 
     const style = document.createElement('style');
@@ -238,21 +303,26 @@
 
     if (on) {
       nav && nav.classList.add('nav-white-mode');
-      if (navBg) gsap.set(navBg, { autoAlpha: 0, display: 'none' });
-      gsap.set(logoNodes, { fill: '#ffffff', stroke: '#ffffff', color: '#ffffff' });
+      if (navBg) gsap.to(navBg, { autoAlpha: 0, duration: 0.6, ease: 'power2.out' });
+      gsap.to(logoNodes, { fill: '#ffffff', stroke: '#ffffff', color: '#ffffff', duration: 0.6, ease: 'power2.out' });
     } else {
       nav && nav.classList.remove('nav-white-mode');
-      if (navBg) gsap.set(navBg, { clearProps: 'display,visibility,opacity,autoAlpha' });
-      gsap.set(logoNodes, { clearProps: 'fill,stroke,color' });
+      if (navBg) gsap.to(navBg, { autoAlpha: 1, duration: 0.6, ease: 'power2.out' });
+      gsap.to(logoNodes, { clearProps: 'fill,stroke,color', duration: 0.6, ease: 'power2.out' });
     }
   }
 
   function setPillGlass(on) {
     const sel = '.promt-pill';
     if (on) {
-      gsap.set(sel, { background: 'rgba(255, 255, 255, 0.60)' });
+      gsap.to(sel, { 
+        background: 'rgba(255, 255, 255, 0.60)',
+        backdropFilter: 'blur(20px)',
+        duration: 0.4,
+        ease: 'power2.out'
+      });
     } else {
-      gsap.set(sel, { clearProps: 'background' });
+      gsap.to(sel, { clearProps: 'background,backdropFilter', duration: 0.4, ease: 'power2.out' });
     }
   }
 
@@ -264,22 +334,25 @@
     const inputStyle = {
       backdropFilter: 'blur(100px)',
       WebkitBackdropFilter: 'blur(100px)',
-      border: '1px solid rgba(255, 255, 255, 1)',
-      background: 'rgba(255, 255, 255, 0.3)',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+      background: 'rgba(255, 255, 255, 0.15)',
       color: '#ffffff',
       boxShadow: `
-        0px 2px 5px 0px rgba(47, 40, 53, 0.15),
-        0px 10px 10px 0px rgba(47, 40, 53, 0.13),
-        0px 21px 13px 0px rgba(47, 40, 53, 0.08),
-        0px 38px 15px 0px rgba(47, 40, 53, 0.02),
-        0px 60px 17px 0px rgba(47, 40, 53, 0)
+        0px 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0px 2px 4px -1px rgba(0, 0, 0, 0.06),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset
       `
     };
 
-    if (searchForm) gsap.set(searchForm, inputStyle);
-    if (inputEl) inputEl.style.color = '#ffffff';
-    if (charCounter) gsap.set(charCounter, { color: '#ffffff' });
-    if (generateButton) gsap.set(generateButton, { background: '#ffffff', color: '#000000' });
+    if (searchForm) gsap.to(searchForm, { ...inputStyle, duration: 0.6, ease: 'power2.out' });
+    if (inputEl) gsap.to(inputEl, { color: '#ffffff', duration: 0.6, ease: 'power2.out' });
+    if (charCounter) gsap.to(charCounter, { color: 'rgba(255, 255, 255, 0.7)', duration: 0.6, ease: 'power2.out' });
+    if (generateButton) gsap.to(generateButton, { 
+      background: '#ffffff', 
+      color: '#000000',
+      duration: 0.6,
+      ease: 'power2.out'
+    });
   }
 
   function removeWhiteInputStyle() {
@@ -287,28 +360,35 @@
     const charCounter    = document.querySelector('.char-counter');
     const generateButton = document.querySelector('.generate-button');
 
-    if (searchForm) gsap.set(searchForm, { clearProps: 'all' });
-    if (inputEl) inputEl.style.color = '';
-    if (charCounter) gsap.set(charCounter, { clearProps: 'color' });
-    if (generateButton) gsap.set(generateButton, { clearProps: 'background,color' });
-  }
-
-  function prepareAllBgs() {
-    bgEls.forEach(bg => {
-      gsap.set(bg, { display: 'block', visibility: 'visible' });
-    });
+    if (searchForm) gsap.to(searchForm, { clearProps: 'all', duration: 0.6, ease: 'power2.out' });
+    if (inputEl) gsap.to(inputEl, { clearProps: 'color', duration: 0.6, ease: 'power2.out' });
+    if (charCounter) gsap.to(charCounter, { clearProps: 'color', duration: 0.6, ease: 'power2.out' });
+    if (generateButton) gsap.to(generateButton, { clearProps: 'background,color', duration: 0.6, ease: 'power2.out' });
   }
 
   function setHeadline(text, color) {
     if (!headlineEl) return;
-    headlineEl.textContent = text;
-    headlineEl.style.color = color;
+    
+    gsap.to(headlineEl, {
+      opacity: 0,
+      y: -10,
+      duration: 0.3,
+      ease: 'power2.in',
+      onComplete: () => {
+        headlineEl.textContent = text;
+        headlineEl.style.color = color;
+        gsap.fromTo(headlineEl, 
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }
+        );
+      }
+    });
+    
     if (subHeadlineEl) {
-      subHeadlineEl.style.color = color;
+      gsap.to(subHeadlineEl, { color: color, duration: 0.6, ease: 'power2.out' });
     }
-    // Update page-title color to match (but don't change text)
     if (pageTitleEl) {
-      pageTitleEl.style.color = color;
+      gsap.to(pageTitleEl, { color: color, duration: 0.6, ease: 'power2.out' });
     }
   }
 
@@ -322,19 +402,15 @@
   }
 
   /******************************************************************
-   * MASTER TIMELINE - FLUID ANIMATIONS WITH IMMEDIATE FEEDBACK
+   * MASTER TIMELINE - WITH SYNCED OVERLAY
    ******************************************************************/
   const master = gsap.timeline({ paused: true });
 
-  // Prepare all backgrounds to be visible for crossfading
-  prepareAllBgs();
+  // PILL 1 JOURNEY
+  master.to(pills[0], { yPercent: -120, autoAlpha: 0, duration: 2.5, ease: 'power2.inOut' });
+  if (pills[1]) master.to(pills[1], { ...SLOTS[0], duration: 2.5, ease: 'power2.inOut' }, '<');
+  if (pills[2]) master.to(pills[2], { ...SLOTS[1], duration: 2.5, ease: 'power2.inOut' }, '<');
 
-  // PILL 1 JOURNEY - Moves and exits smoothly
-  master.to(pills[0], { yPercent: -120, autoAlpha: 0, duration: 2, ease: 'none' });
-  if (pills[1]) master.to(pills[1], { ...SLOTS[0], duration: 2, ease: 'none' }, '<');
-  if (pills[2]) master.to(pills[2], { ...SLOTS[1], duration: 2, ease: 'none' }, '<');
-
-  // Text changes to prompt 2 + thumbnail changes from default to p1
   master.add(gsap.to({}, {
     duration: 0.01,
     onComplete: () => {
@@ -347,47 +423,86 @@
     }
   }));
 
-  // Background crossfade bg0 → bg1 (ANIMATED)
-  master.to(bgEls[0], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[1], { opacity: 1, duration: 2, ease: 'none' }, '<');
-
-  // Generating shows (ANIMATED)
-  master.to(genOverlay, { 
-    display: 'block',
-    visibility: 'visible',
-    autoAlpha: 1, 
-    duration: 1, 
-    ease: 'none',
+  // ✨ IRIS REVEAL: bg1
+  master.to(bgEls[1], {
+    clipPath: 'circle(150% at 50% 50%)',
+    webkitClipPath: 'circle(150% at 50% 50%)',
+    scale: 1,
+    duration: 4,
+    ease: 'power3.out',
     onStart: () => {
-      if (genOverlay) {
-        genOverlay.style.display = 'block';
-        genOverlay.style.visibility = 'visible';
+      if (bgEls[1]) gsap.set(bgEls[1], { zIndex: -8 });
+    },
+    onReverseComplete: () => {
+      if (bgEls[1]) {
+        bgEls[1].style.clipPath = 'circle(0% at 50% 50%)';
+        bgEls[1].style.webkitClipPath = 'circle(0% at 50% 50%)';
+        gsap.set(bgEls[1], { zIndex: -9, scale: 1.1 });
       }
     }
   });
 
-  // bg1 → bg2, generating hides (ANIMATED crossfade)
-  master.to(bgEls[1], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[2], { opacity: 1, duration: 2, ease: 'none' }, '<');
+  master.to(bgEls[0], { 
+    filter: 'blur(10px)', 
+    opacity: 0.3,
+    duration: 2,
+    ease: 'power2.out'
+  }, '<');
+
+  // 🟦 GENERATING OVERLAY - SYNCED WITH IRIS!
   master.to(genOverlay, { 
-    autoAlpha: 0, 
-    duration: 1, 
-    ease: 'none',
+    display: 'block',
+    visibility: 'visible',
+    opacity: 1,
+    clipPath: 'circle(150% at 50% 50%)',
+    webkitClipPath: 'circle(150% at 50% 50%)',
+    duration: 4,
+    ease: 'power3.out',
+    onStart: () => {
+      if (genOverlay) {
+        genOverlay.style.display = 'block';
+        genOverlay.style.visibility = 'visible';
+        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.opacity = '1';
+      }
+    },
+    onReverseComplete: () => {
+      if (genOverlay) {
+        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.display = 'none';
+        genOverlay.style.visibility = 'hidden';
+      }
+    }
+  }, '<');
+
+  master.to(bgEls[2], { 
+    opacity: 1, 
+    zIndex: -7,
+    scale: 1,
+    duration: 2.5, 
+    ease: 'power2.out'
+  });
+  
+  master.to(genOverlay, { 
+    opacity: 0,
+    duration: 1.2, 
+    ease: 'power2.in',
     onComplete: () => {
       if (genOverlay) {
         genOverlay.style.display = 'none';
         genOverlay.style.visibility = 'hidden';
       }
     }
-  }, '<');
+  }, '<+=0.5');
   
   master.addLabel('pill1End');
 
   // PILL 2 JOURNEY
-  master.to(pills[1], { yPercent: -120, autoAlpha: 0, duration: 2, ease: 'none' });
-  if (pills[2]) master.to(pills[2], { ...SLOTS[0], duration: 2, ease: 'none' }, '<');
+  master.to(pills[1], { yPercent: -120, autoAlpha: 0, duration: 2.5, ease: 'power2.inOut' });
+  if (pills[2]) master.to(pills[2], { ...SLOTS[0], duration: 2.5, ease: 'power2.inOut' }, '<');
 
-  // Text + headline + thumbnail changes
   master.add(gsap.to({}, {
     duration: 0.01,
     onComplete: () => {
@@ -402,46 +517,85 @@
     }
   }));
 
-  // Background bg2 → bg3 (ANIMATED crossfade)
-  master.to(bgEls[2], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[3], { opacity: 1, duration: 2, ease: 'none' }, '<');
-
-  // Generating shows (ANIMATED)
-  master.to(genOverlay, { 
-    display: 'block',
-    visibility: 'visible',
-    autoAlpha: 1, 
-    duration: 1, 
-    ease: 'none',
+  // ✨ IRIS REVEAL: bg3
+  master.to(bgEls[3], {
+    clipPath: 'circle(150% at 50% 50%)',
+    webkitClipPath: 'circle(150% at 50% 50%)',
+    scale: 1,
+    duration: 4,
+    ease: 'power3.out',
     onStart: () => {
-      if (genOverlay) {
-        genOverlay.style.display = 'block';
-        genOverlay.style.visibility = 'visible';
+      if (bgEls[3]) gsap.set(bgEls[3], { zIndex: -6 });
+    },
+    onReverseComplete: () => {
+      if (bgEls[3]) {
+        bgEls[3].style.clipPath = 'circle(0% at 50% 50%)';
+        bgEls[3].style.webkitClipPath = 'circle(0% at 50% 50%)';
+        gsap.set(bgEls[3], { zIndex: -9, scale: 1.1 });
       }
     }
   });
 
-  // bg3 → bg4, generating hides (ANIMATED)
-  master.to(bgEls[3], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[4], { opacity: 1, duration: 2, ease: 'none' }, '<');
+  master.to(bgEls[2], { 
+    filter: 'blur(10px)', 
+    opacity: 0.3,
+    duration: 2,
+    ease: 'power2.out'
+  }, '<');
+
+  // 🟦 GENERATING OVERLAY - SYNCED WITH IRIS!
   master.to(genOverlay, { 
-    autoAlpha: 0, 
-    duration: 1, 
-    ease: 'none',
+    display: 'block',
+    visibility: 'visible',
+    opacity: 1,
+    clipPath: 'circle(150% at 50% 50%)',
+    webkitClipPath: 'circle(150% at 50% 50%)',
+    duration: 4,
+    ease: 'power3.out',
+    onStart: () => {
+      if (genOverlay) {
+        genOverlay.style.display = 'block';
+        genOverlay.style.visibility = 'visible';
+        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.opacity = '1';
+      }
+    },
+    onReverseComplete: () => {
+      if (genOverlay) {
+        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.display = 'none';
+        genOverlay.style.visibility = 'hidden';
+      }
+    }
+  }, '<');
+
+  master.to(bgEls[4], { 
+    opacity: 1, 
+    zIndex: -5,
+    scale: 1,
+    duration: 2.5, 
+    ease: 'power2.out'
+  });
+  
+  master.to(genOverlay, { 
+    opacity: 0,
+    duration: 1.2, 
+    ease: 'power2.in',
     onComplete: () => {
       if (genOverlay) {
         genOverlay.style.display = 'none';
         genOverlay.style.visibility = 'hidden';
       }
     }
-  }, '<');
+  }, '<+=0.5');
   
   master.addLabel('pill2End');
 
   // PILL 3 JOURNEY
-  master.to(pills[2], { yPercent: -120, autoAlpha: 0, duration: 2, ease: 'none' });
+  master.to(pills[2], { yPercent: -120, autoAlpha: 0, duration: 2.5, ease: 'power2.inOut' });
 
-  // Text + headline + thumbnail changes
   master.add(gsap.to({}, {
     duration: 0.01,
     onComplete: () => {
@@ -456,47 +610,85 @@
     }
   }));
 
-  // Background bg4 → bg5 (ANIMATED crossfade)
-  master.to(bgEls[4], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[5], { opacity: 1, duration: 2, ease: 'none' }, '<');
-
-  // Generating shows (ANIMATED)
-  master.to(genOverlay, { 
-    display: 'block',
-    visibility: 'visible',
-    autoAlpha: 1, 
-    duration: 1, 
-    ease: 'none',
+  // ✨ IRIS REVEAL: bg5
+  master.to(bgEls[5], {
+    clipPath: 'circle(150% at 50% 50%)',
+    webkitClipPath: 'circle(150% at 50% 50%)',
+    scale: 1,
+    duration: 4,
+    ease: 'power3.out',
     onStart: () => {
-      if (genOverlay) {
-        genOverlay.style.display = 'block';
-        genOverlay.style.visibility = 'visible';
+      if (bgEls[5]) gsap.set(bgEls[5], { zIndex: -4 });
+    },
+    onReverseComplete: () => {
+      if (bgEls[5]) {
+        bgEls[5].style.clipPath = 'circle(0% at 50% 50%)';
+        bgEls[5].style.webkitClipPath = 'circle(0% at 50% 50%)';
+        gsap.set(bgEls[5], { zIndex: -9, scale: 1.1 });
       }
     }
   });
 
-  // bg5 → bg6, generating hides (ANIMATED)
-  master.to(bgEls[5], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[6], { opacity: 1, duration: 2, ease: 'none' }, '<');
+  master.to(bgEls[4], { 
+    filter: 'blur(10px)', 
+    opacity: 0.3,
+    duration: 2,
+    ease: 'power2.out'
+  }, '<');
+
+  // 🟦 GENERATING OVERLAY - SYNCED WITH IRIS!
   master.to(genOverlay, { 
-    autoAlpha: 0, 
-    duration: 1, 
-    ease: 'none',
+    display: 'block',
+    visibility: 'visible',
+    opacity: 1,
+    clipPath: 'circle(150% at 50% 50%)',
+    webkitClipPath: 'circle(150% at 50% 50%)',
+    duration: 4,
+    ease: 'power3.out',
+    onStart: () => {
+      if (genOverlay) {
+        genOverlay.style.display = 'block';
+        genOverlay.style.visibility = 'visible';
+        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.opacity = '1';
+      }
+    },
+    onReverseComplete: () => {
+      if (genOverlay) {
+        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
+        genOverlay.style.display = 'none';
+        genOverlay.style.visibility = 'hidden';
+      }
+    }
+  }, '<');
+
+  master.to(bgEls[6], { 
+    opacity: 1, 
+    zIndex: -3,
+    scale: 1,
+    duration: 2.5, 
+    ease: 'power2.out'
+  });
+  
+  master.to(genOverlay, { 
+    opacity: 0,
+    duration: 1.2, 
+    ease: 'power2.in',
     onComplete: () => {
       if (genOverlay) {
         genOverlay.style.display = 'none';
         genOverlay.style.visibility = 'hidden';
       }
     }
-  }, '<');
+  }, '<+=0.5');
   
   master.addLabel('pill3End');
 
-  // END STAGE - FLUID TRANSITION
-  // Input fades out (ANIMATED)
-  master.to(inputEl, { autoAlpha: 0, duration: 1, ease: 'none' });
+  // END STAGE
+  master.to(inputEl, { autoAlpha: 0, y: -20, duration: 1.2, ease: 'power2.in' });
   
-  // Style changes
   master.add(gsap.to({}, {
     duration: 0.01,
     onComplete: () => {
@@ -510,7 +702,7 @@
       if (inputEl) inputEl.placeholder = TEXT.PLACEHOLDER.final;
       setPillsDisplay(false);
       setTryImagesDisplay(true);
-      if (scrollMore) gsap.set(scrollMore, { display: 'none', visibility: 'hidden', autoAlpha: 0 });
+      if (scrollMore) gsap.to(scrollMore, { autoAlpha: 0, duration: 0.6, ease: 'power2.out' });
     },
     onReverseComplete: () => {
       setHeadline(TEXT.HEADLINE.enhance, HEADLINE_COLORS.White);
@@ -523,31 +715,36 @@
       if (inputEl) inputEl.placeholder = '';
       setPillsDisplay(true);
       setTryImagesDisplay(false);
-      if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 });
+      if (scrollMore) gsap.to(scrollMore, { autoAlpha: 1, duration: 0.6, ease: 'power2.out' });
     }
   }));
 
-  // Background bg6 → bg7 (ANIMATED crossfade)
-  master.to(bgEls[6], { opacity: 0, duration: 2, ease: 'none' });
-  master.to(bgEls[7], { opacity: 1, duration: 2, ease: 'none' }, '<');
+  master.fromTo(bgEls[7], 
+    { opacity: 0, scale: 1.05 },
+    { 
+      opacity: 1, 
+      scale: 1,
+      zIndex: -2,
+      duration: 3, 
+      ease: 'power3.out'
+    }
+  );
   
-  // Input fades back in + marquee (ANIMATED)
-  master.to(inputEl, { autoAlpha: 1, duration: 1, ease: 'none' });
+  master.to(inputEl, { autoAlpha: 1, y: 0, duration: 1.2, ease: 'power2.out' });
   if (marqueeWrapper) {
-    master.to(marqueeWrapper, { autoAlpha: 1, duration: 1.5, ease: 'none' }, '<');
+    master.to(marqueeWrapper, { autoAlpha: 1, duration: 2, ease: 'power2.out' }, '<');
   }
   
   master.addLabel('end');
 
   /******************************************************************
-   * SCROLLTRIGGER - SMOOTH SCRUB, NO SNAP
+   * SCROLLTRIGGER
    ******************************************************************/
   function lockToEnd() {
     const st = ScrollTrigger.getById('hero');
     state.lockedAtEnd = true;
     if (st) {
       st.animation.progress(1).pause();
-      // Keep pinned and force scroll to stay at end
       st.scroll(st.end);
     }
   }
@@ -558,11 +755,10 @@
     trigger: WRAPPER_SEL,
     start: 'top top',
     end: 'bottom bottom',
-    scrub: 0.5,
+    scrub: 1.2,
     pin: PINNED_SEL,
     anticipatePin: 1,
     onUpdate(self) {
-      // If locked, don't allow scrolling back up - keep at end
       if (state.lockedAtEnd) {
         if (self.progress < 0.999) {
           self.scroll(self.end);
@@ -570,7 +766,6 @@
         return;
       }
       
-      // Check if we've reached the end
       if (self.progress >= 0.999 || self.animation.progress() >= 0.999) {
         lockToEnd();
       }
@@ -581,17 +776,16 @@
   });
 
   /******************************************************************
-   * JUMP TO END ON INPUT FOCUS
+   * JUMP TO END
    ******************************************************************/
   function fadeJumpToEnd() {
     if (state.lockedAtEnd) return;
 
-    // Capture current input value BEFORE jumping
     const currentInputValue = inputEl ? inputEl.value : '';
 
     const st = ScrollTrigger.getById('hero');
     const tl = gsap.timeline({
-      defaults: { ease: 'power2.out' },
+      defaults: { ease: 'power3.out' },
       onComplete: () => {
         state.lockedAtEnd = true;
         if (st) {
@@ -602,7 +796,12 @@
     });
 
     tl.to(['.anaimtion-promt-pill', inputEl].filter(Boolean), {
-      autoAlpha: 0, yPercent: -10, duration: 0.25, stagger: 0.05
+      autoAlpha: 0, 
+      yPercent: -20, 
+      scale: 0.95,
+      duration: 0.4, 
+      stagger: 0.08,
+      ease: 'power2.in'
     });
     
     tl.add(() => {
@@ -610,9 +809,13 @@
       setTryImagesDisplay(true);
       state.allowMarquee = true;
       
-      // Show bg7
       bgEls.forEach((bg, i) => {
-        gsap.set(bg, { opacity: i === 7 ? 1 : 0 });
+        gsap.set(bg, { 
+          opacity: i === 7 ? 1 : 0, 
+          zIndex: -10 + i,
+          scale: i === 7 ? 1 : 1.05,
+          filter: i === 7 ? 'blur(0px)' : 'blur(10px)'
+        });
       });
       
       setHeadline(TEXT.HEADLINE.end, HEADLINE_COLORS.Default);
@@ -626,9 +829,8 @@
         genOverlay.style.visibility = 'hidden';
       }
       
-      if (scrollMore) gsap.set(scrollMore, { display: 'none', visibility: 'hidden', autoAlpha: 0 });
+      if (scrollMore) gsap.to(scrollMore, { autoAlpha: 0, duration: 0.4 });
       
-      // KEEP the current prompt text (don't clear it!)
       setRealInputValue(inputEl, currentInputValue);
       if (inputEl) inputEl.placeholder = currentInputValue ? '' : TEXT.PLACEHOLDER.final;
       
@@ -636,8 +838,14 @@
       master.progress(1).pause();
     });
 
-    tl.to(inputEl, { autoAlpha: 1, yPercent: 0, duration: 0.25 });
-    if (marqueeWrapper) tl.to(marqueeWrapper, { autoAlpha: 1, duration: 0.35 }, '<');
+    tl.to(inputEl, { 
+      autoAlpha: 1, 
+      yPercent: 0, 
+      scale: 1,
+      duration: 0.5,
+      ease: 'power3.out'
+    });
+    if (marqueeWrapper) tl.to(marqueeWrapper, { autoAlpha: 1, duration: 0.6 }, '<+=0.2');
   }
 
   if (inputEl) {
@@ -659,14 +867,14 @@
     gsap.set('.anaimtion-promt-pill', { autoAlpha: 1, display: 'flex', visibility: 'visible' });
     setTryImagesDisplay(false);
     gsap.set(marqueeWrapper, { autoAlpha: 1 });
-    if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 }); // Visible in reduced motion
+    if (scrollMore) gsap.set(scrollMore, { display: 'block', visibility: 'visible', autoAlpha: 1 });
     bgEls.forEach((bg, i) => gsap.set(bg, { opacity: i === 0 ? 1 : 0 }));
     if (genOverlay) {
       genOverlay.style.display = 'none';
       genOverlay.style.visibility = 'hidden';
     }
     setHeadline(TEXT.HEADLINE.start, HEADLINE_COLORS.White);
-    setPlaceholderState('default'); // START with addButton visible, no thumbnails
+    setPlaceholderState('default');
     setNavWhiteMode(true);
     applyWhiteInputStyle();
     setPillGlass(true);

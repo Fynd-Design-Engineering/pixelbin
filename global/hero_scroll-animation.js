@@ -637,61 +637,19 @@
   }, '<');
 
   // 🟦 GENERATING OVERLAY - SYNCED WITH IRIS!
-  master.to(genOverlay, { 
-    display: 'block',
-    visibility: 'visible',
-    opacity: 1,
+  // 🟦 ATOMIC TRANSITION - Complete in one scroll motion
+const finalTransition = gsap.timeline();
+
+finalTransition
+  .to(genOverlay, { 
+    display: 'block', visibility: 'visible', opacity: 1,
     clipPath: 'circle(150% at 50% 50%)',
     webkitClipPath: 'circle(150% at 50% 50%)',
-    duration: 4,
-    ease: 'power3.out',
+    duration: 0.8, ease: 'power2.out'
+  })
+  .to(genOverlay, { 
+    opacity: 0, duration: 0.4,
     onStart: () => {
-      if (genOverlay) {
-        genOverlay.style.display = 'block';
-        genOverlay.style.visibility = 'visible';
-        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
-        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
-        genOverlay.style.opacity = '1';
-      }
-    },
-    onReverseComplete: () => {
-      if (genOverlay) {
-        genOverlay.style.clipPath = 'circle(0% at 50% 50%)';
-        genOverlay.style.webkitClipPath = 'circle(0% at 50% 50%)';
-        genOverlay.style.display = 'none';
-        genOverlay.style.visibility = 'hidden';
-      }
-    }
-  }, '<');
-
-  master.to(bgEls[6], { 
-    opacity: 1, 
-    zIndex: -3,
-    scale: 1,
-    duration: 2.5, 
-    ease: 'power2.out'
-  });
-  
-  master.to(genOverlay, { 
-    opacity: 0,
-    duration: 1.2, 
-    ease: 'power2.in',
-    onComplete: () => {
-      if (genOverlay) {
-        genOverlay.style.display = 'none';
-        genOverlay.style.visibility = 'hidden';
-      }
-    }
-  }, '<+=0.5');
-  
-  master.addLabel('pill3End');
-
-  // END STAGE
-  master.to(inputEl, { autoAlpha: 0, y: -20, duration: 1.2, ease: 'power2.in' });
-  
-  master.add(gsap.to({}, {
-    duration: 0.01,
-    onComplete: () => {
       setHeadline(TEXT.HEADLINE.end, HEADLINE_COLORS.Default);
       setNavWhiteMode(false);
       removeWhiteInputStyle();
@@ -704,38 +662,23 @@
       setTryImagesDisplay(true);
       if (scrollMore) gsap.to(scrollMore, { autoAlpha: 0, duration: 0.6, ease: 'power2.out' });
     },
-    onReverseComplete: () => {
-      setHeadline(TEXT.HEADLINE.enhance, HEADLINE_COLORS.White);
-      setNavWhiteMode(true);
-      applyWhiteInputStyle();
-      setPillGlass(true);
-      setPlaceholderState('p3');
-      state.allowMarquee = false;
-      setRealInputValue(inputEl, TEXT.PROMPTS[3]);
-      if (inputEl) inputEl.placeholder = '';
-      setPillsDisplay(true);
-      setTryImagesDisplay(false);
-      if (scrollMore) gsap.to(scrollMore, { autoAlpha: 1, duration: 0.6, ease: 'power2.out' });
+    onComplete: () => {
+      if (genOverlay) {
+        genOverlay.style.display = 'none';
+        genOverlay.style.visibility = 'hidden';
+      }
     }
-  }));
-
-  master.fromTo(bgEls[7], 
+  }, 0.8)
+  .fromTo(bgEls[7], 
     { opacity: 0, scale: 1.05 },
-    { 
-      opacity: 1, 
-      scale: 1,
-      zIndex: -2,
-      duration: 3, 
-      ease: 'power3.out'
-    }
-  );
-  
-  master.to(inputEl, { autoAlpha: 1, y: 0, duration: 1.2, ease: 'power2.out' });
-  if (marqueeWrapper) {
-    master.to(marqueeWrapper, { autoAlpha: 1, duration: 2, ease: 'power2.out' }, '<');
-  }
-  
-  master.addLabel('end');
+    { opacity: 1, scale: 1, zIndex: -2, duration: 0.6 }, 0.9)
+  .to(inputEl, { autoAlpha: 1, y: 0, duration: 0.4 }, 1.0);
+
+if (marqueeWrapper) {
+  finalTransition.to(marqueeWrapper, { autoAlpha: 1, duration: 0.4 }, 1.1);
+}
+
+master.add(finalTransition);master.addLabel('end');
 
   /******************************************************************
    * SCROLLTRIGGER

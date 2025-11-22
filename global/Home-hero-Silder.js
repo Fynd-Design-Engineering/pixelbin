@@ -459,7 +459,7 @@ function updatePositions() {
         wrapper.style.bottom = '';
         wrapper.style.top = '50%';
         wrapper.style.left = '50%';
-        wrapper.style.transform = `translate3d(-50%, ${-50 + position}px, 0)`;
+        wrapper.style.transform = `translate(-50%, calc(-50% + ${position}px))`;
       } else {
         wrapper.style.left = '50%';
         wrapper.style.bottom = '22%';

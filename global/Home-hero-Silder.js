@@ -1,7 +1,5 @@
 /**
  * AI PHOTO EDITOR CAROUSEL - Webflow Version
- * Focus-zoom works on DESKTOP ONLY (no zoom on mobile). Spacing prevents overlap.
- * Fully self-contained replacement. Drop in for your existing script.
  */
 
 const DEBUG = false;
@@ -324,12 +322,12 @@ function getDimsFromDistance(ad) {
       : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };   // desktop portrait
   } else if (ad < 1.5) {
     return isMobile
-      ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
-      : { width: 272, height: 340, opacity: 0.2, yOffset: 0, shadow: false };
+      ? { width: 240, height: 300, opacity: 0.5, yOffset: 0, shadow: false }
+      : { width: 272, height: 340, opacity: 0.5, yOffset: 0, shadow: false };
   }
   return isMobile
-    ? { width: 240, height: 300, opacity: 0.05, yOffset: 0, shadow: false }
-    : { width: 208, height: 260, opacity: 0.05, yOffset: 0, shadow: false };
+    ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
+    : { width: 208, height: 260, opacity: 0.2, yOffset: 0, shadow: false };
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -357,74 +355,69 @@ function createSlideHTML(slide, dimensions) {
 }
 
 function initCarousel() {
-  log('🔄 Initializing carousel...');
+  log('🔄 Initializing carousel (9 nodes)…');
   sliderTrack = q('slider-track');
   if (!sliderTrack) { console.error('❌ Slider track not found!'); return; }
 
   sliderTrack.innerHTML = '';
   slideElements = [];
 
-  for (let set = 0; set < 3; set++) {
-    slides.forEach((slide, idx) => {
-      const absoluteIndex = -slides.length + set * slides.length + idx;
-      const dims = getDimsFromDistance(Math.abs(getSignedDistance(absoluteIndex, 0)));
+  // Build exactly one set and keep absoluteIndex mutable (recycled later)
+  slides.forEach((slide, idx) => {
+    const absoluteIndex = idx; // IMPORTANT: mutable; recycled in updatePositions()
+    const dims = getDimsFromDistance(Math.abs(getSignedDistance(absoluteIndex, 0)));
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'slide-card-wrapper';
-      wrapper.dataset.absoluteIndex = String(absoluteIndex);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'slide-card-wrapper';
+    wrapper.dataset.absoluteIndex = String(absoluteIndex);
 
-      const cardContainer = document.createElement('div');
-      cardContainer.style.cssText = 'width:100%;height:100%;';
-      cardContainer.innerHTML = createSlideHTML(slide, dims);
+    const cardContainer = document.createElement('div');
+    cardContainer.style.cssText = 'width:100%;height:100%;';
+    cardContainer.innerHTML = createSlideHTML(slide, dims);
 
-      wrapper.appendChild(cardContainer);
-      sliderTrack.appendChild(wrapper);
+    wrapper.appendChild(cardContainer);
+    sliderTrack.appendChild(wrapper);
 
-      const slideCard  = cardContainer.querySelector('.slide-card');
-      const slideImage = cardContainer.querySelector('.slide-card-single-img');
+    const slideCard  = cardContainer.querySelector('.slide-card');
+    const slideImage = cardContainer.querySelector('.slide-card-single-img');
 
-      slideElements.push({
-        wrapper,
-        cardContainer,
-        slide,
-        absoluteIndex,
-        slideCard,
-        slideImage
-      });
-
-      // --- Assign optimized image variant + priorities ---
-      if (slideImage) {
-        // store the unmodified base URL once
-        slideImage.dataset.srcBase = slide.images[0];
-
-        const dist0 = Math.abs(getSignedDistance(absoluteIndex, 0));
-        // Priority hints BEFORE setting src
-        if (dist0 < 1.5) {
-          slideImage.loading = 'eager';
-          slideImage.decoding = 'async';
-          slideImage.fetchPriority = 'high';
-        } else {
-          slideImage.loading = 'lazy';
-          slideImage.decoding = 'async';
-          slideImage.fetchPriority = 'low';
-        }
-
-        // Choose size by distance from center
-        if (dist0 < 0.5) {
-          slideImage.src = largeVariant(slideImage.dataset.srcBase);
-        } else if (dist0 < 1.5) {
-          slideImage.src = smallVariant(slideImage.dataset.srcBase);
-        } else {
-          slideImage.src = tinyVariant(slideImage.dataset.srcBase);
-        }
-
-        // Pre-decode near-center to avoid first-motion jank
-        if (dist0 < 1.5) {
-          Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
-        }
-      }
+    slideElements.push({
+      wrapper,
+      cardContainer,
+      slide,
+      absoluteIndex, // mutable
+      slideCard,
+      slideImage
     });
-  }
+
+    // --- image variant + priority, same as before ---
+    if (slideImage) {
+      slideImage.dataset.srcBase = slide.images[0];
+
+      const dist0 = Math.abs(getSignedDistance(absoluteIndex, 0));
+      if (dist0 < 1.5) {
+        slideImage.loading = 'eager';
+        slideImage.decoding = 'async';
+        slideImage.fetchPriority = 'high';
+      } else {
+        slideImage.loading = 'lazy';
+        slideImage.decoding = 'async';
+        slideImage.fetchPriority = 'low';
+      }
+
+      if (dist0 < 0.5) {
+        slideImage.src = largeVariant(slideImage.dataset.srcBase);
+      } else if (dist0 < 1.5) {
+        slideImage.src = smallVariant(slideImage.dataset.srcBase);
+      } else {
+        slideImage.src = tinyVariant(slideImage.dataset.srcBase);
+      }
+
+      if (dist0 < 1.5) {
+        Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
+      }
+    }
+  });
 
   currentOffset = 0;
   updatePositions();
@@ -433,15 +426,34 @@ function initCarousel() {
 }
 
 
+// Keep each node’s absoluteIndex close to currentOffset to avoid large distances
+function recycleIndexNearWindow(item) {
+  const n = slides.length;
+  // choose a target k such that (k % n) == (slide.id-1) and |k - currentOffset| is minimal
+  // (we already store absoluteIndex with that congruence; just shift by ±n as needed)
+  let d = getSignedDistance(item.absoluteIndex, currentOffset); // in slide units, wrapped
+  // d is already wrapped to [-n/2, n/2], but absoluteIndex itself may drift;
+  // when |d| exceeds our render window, move the element by ±n until it’s close.
+  const WINDOW = 4.5; // wider than your 3.5 visibility cutoff
+  while (d >  WINDOW) { item.absoluteIndex -= n; d -= n; }
+  while (d < -WINDOW) { item.absoluteIndex += n; d += n; }
+
+  // keep data-attribute in sync (optional, for debugging)
+  item.wrapper.dataset.absoluteIndex = String(item.absoluteIndex);
+}
+
 
 function updatePositions() {
   requestAnimationFrame(() => {
-    slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
+    slideElements.forEach((el) => {
+      recycleIndexNearWindow(el); // <-- new line
+
+      const { wrapper, slideCard, slideImage, absoluteIndex } = el;
       applyWrapperTransition(wrapper);
 
-      const dSigned = getSignedDistance(absoluteIndex, currentOffset);
-      const ad = Math.abs(dSigned);
-      const position = getCardPosition(absoluteIndex, currentOffset);
+      const dSigned   = getSignedDistance(absoluteIndex, currentOffset);
+      const ad        = Math.abs(dSigned);
+      const position  = getCardPosition(absoluteIndex, currentOffset);
       const isVisible = ad <= 3.5;
       const dimensions = getDimsFromDistance(ad);
       

@@ -50,7 +50,7 @@ let sliderTrack;
 
 let autoInterval = null;
 let isUserActive = false;
-const ROTATION_DELAY = 2000;
+const ROTATION_DELAY = 3000;
 
 let storedPrompt = '';
 let isPromptExpanded = false;
@@ -851,13 +851,14 @@ function endDesktopDrag() {
 
 function setupEventHandlers() {
   // Wheel tuning (keep old logic; just smoother values)
-  let wheelV = 0, wheelRAF = null, wheelAnimating = false;
-  const WHEEL_ACCEL    = 0.0012;  // lower sensitivity
-  const WHEEL_FRICTION = 0.90;    // less glide
-  const WHEEL_MIN_V    = 0.0015;  // stop threshold
-  const WHEEL_MAX_V    = 0.18;    // lower top speed
-  const PER_FRAME_VEL_CAP = 0.12; // cap per-frame motion
-  const DEADZONE_PX = 2;          // ignore tiny scrolls
+let wheelV = 0, wheelRAF = null, wheelAnimating = false;
+const WHEEL_ACCEL        = 0.0012; // how much deltaX/Y turns into velocity
+const WHEEL_FRICTION     = 0.92;   // glide: higher = longer coast
+const WHEEL_MIN_V        = 0.5015; // stop threshold
+const WHEEL_MAX_V        = 2.14;   // absolute velocity ceiling
+const PER_FRAME_VEL_CAP  = 0.20;   // max delta per frame (prevents bursts)
+const DEADZONE_PX        = 3;      // ignore micro scrolls/touchpad noise
+
 
   const inputs = [q('textInput'), q('textArea')].filter(Boolean);
 

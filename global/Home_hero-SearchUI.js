@@ -1,0 +1,1072 @@
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  const container = document.getElementById("searchContainer");
+  if (!container) {
+    console.error("[UI] #searchContainer not found");
+    return;
+  }
+
+  const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
+  const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
+  const HINT_ON_SUBMIT_ONLY = true;
+
+  // Loader image shown in the thumbnail until the real image finishes loading
+  const LOADER_IMG = "https://cdn.prod.website-files.com/673193e0642e6ad25696fcd4/6921902dc9c1daf39440e804_image%20(8).png";
+
+  const IMAGE_KEYWORDS = ["remove", "erase", "delete", "replace", "edit", "upscale"];
+  const keywordNeedsImage = (text) => {
+    if (!text) return false;
+    const t = text.toLowerCase();
+    return IMAGE_KEYWORDS.some((k) =>
+      new RegExp(`\\b${k.replace(/\s+/g, "\\s+")}\\b`, "i").test(t)
+    );
+  };
+
+  const form = document.getElementById("searchForm");
+  const formContent = document.getElementById("formContent");
+  const imagesSection = document.getElementById("imagesSection");
+  const textInput = document.getElementById("textInput");
+  const textArea = document.getElementById("textArea");
+  const toolbar = document.getElementById("toolbar");
+  const addButton = document.getElementById("addButton");
+  const generateButton = document.getElementById("generateButton");
+  const generateText = generateButton?.querySelector(".generate-text");
+  const tooltip = document.getElementById("tooltip");
+  const fileInput = document.getElementById("fileInput");
+  const charCounter = document.getElementById("charCounter");
+
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"];
+  const MAX_MB = 25;
+  const MAX_IMAGES = 1;
+
+  const isValidImageFile = (f) => {
+    if (!f) return false;
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    return (
+      f.type.startsWith("image/") &&
+      (ALLOWED_TYPES.includes(f.type) || ALLOWED_EXTS.includes(ext)) &&
+      f.size <= MAX_MB * 1024 * 1024
+    );
+  };
+
+  // Convert external image URL to a File so upload path is unified
+  async function externalUrlToFile(url, slideKey = "carousel") {
+    const res = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+    const blob = await res.blob();
+
+    const mime = blob.type || "image/jpeg";
+    const ext =
+      mime === "image/png"  ? "png"  :
+      mime === "image/webp" ? "webp" : "jpg";
+
+    const safeKey = (slideKey || "carousel").toLowerCase().replace(/[^\w-]+/g, "-");
+    return new File([blob], `carousel-${safeKey}-${Date.now()}.${ext}`, { type: mime });
+  }
+
+  function hasExternalImage(url, slideKey) {
+    return state.images.some(
+      (x) => x.url === url || (slideKey && x.slideKey === slideKey)
+    );
+  }
+
+  function addExternalImage(url, slideKey, source = "carousel") {
+    if (!url) return;
+
+    const userCount = state.images.filter(x => x.source === "user").length;
+
+    // Respect user limit; carousel never overrides user slot
+    if (source !== "user" && userCount >= MAX_IMAGES) return;
+    if (source === "user" && userCount >= MAX_IMAGES) return;
+
+    if (hasExternalImage(url, slideKey)) return;
+
+    state.images.push({ file: null, url, slideKey, source, loading: true });
+    onThumbLoadStart();
+    updateState();
+    updateAddButtonState();
+  }
+
+  function clearImagesByScope(scope = "all") {
+    if (scope === "carousel") {
+      // drop only carousel-injected items
+      const kept = [];
+      state.images.forEach((x) => {
+        if (x.source === "carousel") {
+          if (x.loading) onThumbLoadDone();
+        } else {
+          kept.push(x);
+        }
+      });
+      state.images = kept;
+    } else {
+      // drop all, revoke blobs for user uploads
+      state.images.forEach((x) => {
+        if (x.loading) onThumbLoadDone();
+        if (x.file && x.url?.startsWith("blob:")) URL.revokeObjectURL(x.url);
+      });
+      state.images = [];
+    }
+    updateState();
+    updateAddButtonState();
+  }
+
+  const state = {
+    inputValue: "",
+    images: [],
+    active: false,
+    mode: "empty",
+    maxChars: MAX_CHARS,
+    pendingImages: 0,      // number of thumbnails still loading
+    submitting: false,     // prevent double submits
+  };
+
+  function onThumbLoadStart() {
+    state.pendingImages++;
+    updateUI();
+  }
+  function onThumbLoadDone() {
+    if (state.pendingImages > 0) state.pendingImages--;
+    updateUI();
+  }
+
+  const setMobileStyles = () => {
+    const isMobile = window.innerWidth < 768;
+    container.classList.toggle("mobile", isMobile);
+    textInput?.classList.toggle("mobile", isMobile);
+    if (generateText) generateText.style.display = isMobile ? "none" : "inline";
+    generateButton?.classList.toggle("mobile-icon", isMobile);
+  };
+
+  const showImageHint = () => {
+    tooltip?.classList.add("show");
+    addButton?.classList.add("active");
+  };
+  const hideImageHint = () => {
+    tooltip?.classList.remove("show");
+    addButton?.classList.remove("active");
+  };
+
+  const updateCharCounter = () => {
+    const len = state.inputValue.length;
+    if (charCounter) {
+      charCounter.textContent = `${len}/${state.maxChars}`;
+      charCounter.classList.toggle("over", len > state.maxChars);
+    }
+    form?.classList.toggle("over-limit", len > state.maxChars);
+  };
+
+  function updateAddButtonState() {
+    const userCount = state.images.filter(x => x.source === "user").length;
+    const atLimit = userCount >= MAX_IMAGES;
+
+    if (addButton) {
+      const disabled = atLimit || state.submitting;
+      addButton.disabled = disabled;
+      addButton.classList.toggle("is-disabled", disabled);
+      addButton.setAttribute("aria-disabled", String(disabled));
+    }
+    if (atLimit) hideImageHint();
+  }
+
+  // --- Thumbnails renderer (explicit sizes; no re-entrant state updates) ---
+  const renderImages = () => {
+    if (!imagesSection) return;
+
+    // make sure the container is visibly laid out
+    imagesSection.classList.remove("hidden");
+    imagesSection.style.display = "flex";
+    imagesSection.style.gap = "8px";
+    imagesSection.style.flexWrap = "wrap";
+
+    imagesSection.innerHTML = "";
+
+    state.images.forEach((img, idx) => {
+      const div = document.createElement("div");
+      div.className = "image-thumbnail";
+      if (img.loading) div.classList.add("loading");
+      if (img.source)   div.dataset.source   = img.source;
+      if (img.slideKey) div.dataset.slideKey = img.slideKey;
+      div.dataset.url = img.url;
+      // explicit size so it actually shows
+      div.style.cssText = "width:64px;height:64px;position:relative;border-radius:12px;overflow:hidden;background:#f4f4f5;";
+
+      // Visible preview: start with loader image
+      const pic = document.createElement("img");
+      pic.alt = "preview";
+      pic.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+      pic.src = LOADER_IMG;
+
+      // Preload actual image, then swap
+      const preload = new Image();
+      preload.onload = () => {
+        pic.src = img.url;
+        if (img.loading) {
+          img.loading = false;
+          div.classList.remove("loading");
+          onThumbLoadDone();
+        }
+      };
+      preload.onerror = () => {
+        // Keep loader; mark as done and show small badge
+        if (img.loading) {
+          img.loading = false;
+          div.classList.remove("loading");
+          onThumbLoadDone();
+        }
+        const badge = document.createElement("div");
+        badge.className = "image-badge";
+        badge.textContent = "Unsupported Format";
+        badge.style.cssText = "position:absolute;bottom:6px;left:6px;right:6px;padding:4px 6px;border-radius:8px;background:#fff;border:1px solid #e5e7eb;font:500 11px/1.2 Inter,system-ui,sans-serif;color:#6b7280;text-align:center;";
+        div.appendChild(badge);
+      };
+      preload.src = img.url;
+
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "image-close";
+      close.setAttribute("aria-label", "Remove image");
+      close.textContent = "×";
+      close.style.cssText = "position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:10px;border:none;background:rgba(0,0,0,.5);color:#fff;cursor:pointer;line-height:18px;text-align:center;";
+      close.addEventListener("click", () => {
+        if (state.images[idx]?.file && state.images[idx]?.url?.startsWith("blob:")) {
+          URL.revokeObjectURL(state.images[idx].url);
+        }
+        if (state.images[idx]?.loading) onThumbLoadDone();
+        state.images.splice(idx, 1);
+        // re-render without calling updateState() to avoid loops
+        renderImages();
+        // keep controls in sync
+        updateAddButtonState();
+        // adjust rows after removal
+        if (textArea && !textArea.classList.contains("hidden")) {
+          textArea.rows = desiredRows();
+        }
+      });
+
+      div.appendChild(pic);
+      div.appendChild(close);
+      imagesSection.appendChild(div);
+    });
+
+    // adjust rows after thumbnails render
+    if (textArea && !textArea.classList.contains("hidden")) {
+      textArea.rows = desiredRows();
+    }
+  };
+
+  function switchLayoutWithoutAnimation(multi) {
+    const els = [form, formContent, toolbar];
+    const prevTransitions = els.map((el) => (el ? el.style.transition : ""));
+    els.forEach((el) => { if (el) el.style.transition = "none"; });
+
+    form?.classList.toggle("multi-line", multi);
+    form?.classList.toggle("single-line", !multi);
+    container?.classList.toggle("multi-line", multi);
+    container?.classList.toggle("single-line", !multi);
+
+    formContent?.classList.toggle("single-line", !multi);
+    toolbar?.classList.toggle("single-line", !multi);
+
+    form?.offsetHeight; // force reflow
+    requestAnimationFrame(() => {
+      els.forEach((el, i) => { if (el) el.style.transition = prevTransitions[i] || ""; });
+    });
+  }
+
+  // --- Control multiline rows based on thumbnails ---
+  // If no image thumbnails -> 5 rows (to keep container height)
+  // If there are thumbnails -> 2 rows
+  function hasAnyThumbnails() {
+    return !!(imagesSection && imagesSection.querySelector('.image-thumbnail'));
+  }
+  function desiredRows() {
+    return hasAnyThumbnails() ? 2 : 5;
+  }
+
+  const updateUI = (flipLayout = false) => {
+    const wasMulti = form?.classList.contains("multi-line");
+    const stickyMulti = state.active && wasMulti; // keep multiline open while focused
+    const multi = state.mode === "image-attached" || state.mode === "multiline" || stickyMulti;
+
+    if (flipLayout) switchLayoutWithoutAnimation(multi);
+
+    if (multi) {
+      textInput?.classList.add("hidden");
+      textArea?.classList.remove("hidden");
+      if (textArea) {
+        textArea.value = state.inputValue;
+        textArea.rows = desiredRows();
+      }
+    } else {
+      textInput?.classList.remove("hidden");
+      textArea?.classList.add("hidden");
+      if (textInput) textInput.value = state.inputValue;
+    }
+
+    if (imagesSection) {
+      if (state.images.length > 0) {
+        renderImages();
+      } else {
+        imagesSection.classList.add("hidden");
+        imagesSection.innerHTML = "";
+      }
+    }
+
+    const promptPresent = state.inputValue.trim().length > 0;
+    const overLimit = state.inputValue.length > state.maxChars;
+    const canGenerate = promptPresent && !overLimit && state.pendingImages === 0 && !state.submitting;
+
+    generateButton?.classList.toggle("active", canGenerate);
+    generateButton?.classList.toggle("inactive", !canGenerate);
+    if (generateButton) {
+      generateButton.disabled = !canGenerate;
+      generateButton.setAttribute("aria-disabled", String(!canGenerate));
+    }
+
+    updateAddButtonState();
+  };
+
+  const updateState = () => {
+    const prevMode = state.mode;
+
+    if (state.images.length > 0) state.mode = "image-attached";
+    else if (state.inputValue.length > 67) state.mode = "multiline";
+    else if (state.inputValue.length > 0) state.mode = "filled";
+    else if (state.active) state.mode = "active";
+    else state.mode = "empty";
+
+    const layoutChanged = prevMode !== state.mode;
+    updateUI(layoutChanged);
+    updateCharCounter();
+
+    if (textArea && !textArea.classList.contains("hidden")) {
+      textArea.rows = desiredRows();
+    }
+  };
+
+  function setGenerating(on) {
+    state.submitting = !!on;
+
+    if (generateButton) {
+      const label = generateButton.querySelector(".generate-text");
+      if (label) label.textContent = on ? "Generating..." : "Generate";
+      generateButton.classList.toggle("loading", on);
+      generateButton.disabled = true;
+      generateButton.setAttribute("aria-busy", String(on));
+      generateButton.setAttribute("aria-disabled", "true");
+    }
+
+    // Lock addButton while submitting
+    updateAddButtonState();
+
+    // Soft-disable text inputs during submit (optional)
+    if (on) {
+      textInput?.setAttribute("readonly", "readonly");
+      textArea?.setAttribute("readonly", "readonly");
+    } else {
+      textInput?.removeAttribute("readonly");
+      textArea?.removeAttribute("readonly");
+    }
+  }
+
+  window.addEventListener("resize", setMobileStyles);
+  setMobileStyles();
+
+  textInput?.addEventListener("input", (e) => {
+    state.inputValue = e.target.value;
+    updateState();
+  });
+  textInput?.addEventListener("focus", () => {
+    state.active = true;
+    updateState();
+  });
+
+  textArea?.addEventListener("input", (e) => {
+    state.inputValue = e.target.value;
+    updateState();
+  });
+  textArea?.addEventListener("focus", () => {
+    state.active = true;
+    updateState();
+  });
+
+  // When either input blurs and there is no content or images, drop active mode
+  function handleBlur() {
+    if (!state.inputValue && state.images.length === 0) {
+      state.active = false;
+      updateState();
+    }
+  }
+  textArea?.addEventListener("blur", handleBlur);
+  textInput?.addEventListener("blur", handleBlur);
+
+  addButton?.addEventListener("click", () => {
+    const userCount = state.images.filter(x => x.source === "user").length;
+    if (userCount >= MAX_IMAGES) {
+      flashError(`Maximum ${MAX_IMAGES} images allowed.`);
+      return;
+    }
+    if (state.submitting) return;
+    fileInput?.click();
+  });
+  addButton?.addEventListener("mouseenter", () => {
+    addButton.classList.add("active");
+    if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show");
+  });
+  addButton?.addEventListener("mouseleave", () => {
+    addButton.classList.remove("active");
+    tooltip?.classList.remove("show");
+  });
+
+  fileInput?.addEventListener("change", (e) => {
+    const incoming = Array.from(e.target.files || []);
+    if (!incoming.length) return;
+
+    const userCount = state.images.filter(x => x.source === "user").length;
+    const remaining = Math.max(0, MAX_IMAGES - userCount);
+    const selected = incoming.slice(0, remaining);
+    const ignored = incoming.length - selected.length;
+
+    for (const f of selected) {
+      if (!isValidImageFile(f)) {
+        flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`);
+        continue;
+      }
+      const url = URL.createObjectURL(f);
+      // User upload wins → clear injected thumbnails
+      clearImagesByScope("carousel");
+      state.images.push({ file: f, url, source: "user", loading: true });
+      onThumbLoadStart();
+      try { window.aiPhotoCarousel?.markUserUpload?.(url); } catch {}
+    }
+
+    if (ignored > 0) {
+      flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
+    }
+
+    updateState();
+    updateAddButtonState();
+    e.target.value = "";
+  });
+
+  // Submit handler
+  generateButton?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (state.submitting) return;
+
+    // Block generate while thumbnails pending
+    if (state.pendingImages > 0) {
+      const tip = tooltip?.querySelector(".tooltip-text");
+      if (tip) {
+        const restore = tip.textContent;
+        tip.textContent = "File Upload Pending";
+        tooltip.classList.add("show");
+        setTimeout(() => {
+          tooltip.classList.remove("show");
+          tip.textContent = restore || "Upload image";
+        }, 1200);
+      }
+      return;
+    }
+
+    const prompt = state.inputValue.trim();
+    const needs = keywordNeedsImage(prompt);
+
+    if (!prompt) { flashError("Please enter a prompt."); return; }
+    if (prompt.length > state.maxChars) {
+      flashError(`Prompt too long. Max ${state.maxChars} characters.`);
+      return;
+    }
+
+    const files = state.images.map(x => x.file).filter(Boolean);
+    const externalEntry = state.images.find(x => !x.file);
+    const externalImageUrl = externalEntry?.url;
+    const externalSlideKey = externalEntry?.slideKey || "carousel";
+
+    if (needs && files.length === 0 && !externalImageUrl) {
+      showImageHint();
+      addButton?.focus({ preventScroll: false });
+      flashError("This prompt needs an image. Please upload one.");
+      return;
+    }
+
+    const studioRoute = `/studio/${TOOL_NAME}`;
+
+    // Prompt only
+    if (!needs && files.length === 0 && !externalImageUrl) {
+      setGenerating(true);
+      try {
+        const redirectURL = pbBuildStudioRedirect(studioRoute, undefined, prompt);
+        window.location.href = redirectURL;
+      } catch (err) {
+        console.error("[redirect fail]", err);
+        flashError("Navigation failed. Please try again.");
+        setGenerating(false);
+      }
+      return;
+    }
+
+    // Unified upload path
+    (async () => {
+      try {
+        setGenerating(true);
+        try { showProgress?.(); setProgress?.(0); } catch {}
+
+        let file = files[0];
+        if (!file && externalImageUrl) {
+          file = await externalUrlToFile(externalImageUrl, externalSlideKey);
+          if (!isValidImageFile(file)) {
+            throw new Error("Only JPG, JPEG, PNG, WEBP up to 25 MB are allowed.");
+          }
+        }
+        if (!file) throw new Error("No file selected.");
+
+        const captcha = await pbGetRecaptchaToken();
+        if (!captcha) throw new Error("reCAPTCHA token missing");
+
+        const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) => {
+          try { setProgress?.(pct); } catch {}
+        });
+        if (!resp?.url) throw new Error("Upload succeeded but no URL returned");
+
+        const redirectURL = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
+        window.location.href = redirectURL;
+      } catch (err) {
+        console.error("[submit fail]", err);
+        try { flashErrorInline?.(err?.message || "Upload failed. Please try again."); }
+        catch { flashError(err?.message || "Upload failed. Please try again."); }
+        setGenerating(false);
+      } finally {
+        try { hideProgress?.(); } catch {}
+      }
+    })();
+  });
+
+  function flashError(msg) {
+    console.error(msg);
+    const box = document.getElementById("uploadError");
+    const txt = document.getElementById("uploadErrorText");
+    if (box && txt) {
+      txt.textContent = msg;
+      box.style.display = "block";
+    }
+    form?.classList.add("error");
+    setTimeout(() => form?.classList.remove("error"), 1200);
+  }
+
+  // Chips API
+  window.searchFeature = {
+    setPrompt(text) {
+      const next = text || "";
+      state.inputValue = next;
+
+      // reflect into visible control
+      if (form?.classList.contains("multi-line")) {
+        if (textArea) textArea.value = next;
+      } else {
+        if (textInput) textInput.value = next;
+      }
+
+      updateState();
+    },
+    setExternalImage(url, slideKey) {
+      addExternalImage(url, slideKey, "carousel");
+    },
+    clearImages(scope = "all") {
+      clearImagesByScope(scope);
+    },
+  };
+});
+
+
+
+(() => {
+  const PB_DEBUG = true;
+
+  const host = location.hostname;
+  const isStaging =
+    host.includes("webflow.io") || host.includes("pixelbinz0.de");
+
+  const searchContainer = document.getElementById("searchContainer");
+  const dataset = searchContainer ? searchContainer.dataset : {};
+  const readDataset = (key) => {
+    const value = dataset?.[key];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const defaultClientKey = readDataset("clientKey");
+  const stagingClientKey =
+    readDataset("clientKeyStaging") || readDataset("stagingClientKey");
+  const productionClientKey =
+    readDataset("clientKeyProduction") || readDataset("productionClientKey");
+  const resolvedProdKey = productionClientKey || defaultClientKey || "1234567";
+  const resolvedStagingKey =
+    stagingClientKey || defaultClientKey || resolvedProdKey;
+  const PB_ENV = {
+    API_URL: isStaging
+      ? "https://api.pixelbinz0.de/service/panel/assets/v1.0/upload/direct"
+      : "https://api.pixelbin.io/service/panel/assets/v1.0/upload/direct",
+    SITE_KEY: isStaging
+      ? "6LeJwSsdAAAAACEftEzfp4h_f520nfzmrhbrc3Q3"
+      : "6LcgwSsdAAAAAJO_QsCkkQuSlkOal2jqXic2Zuvj",
+    CONSOLE_BASE: isStaging
+      ? "https://console.pixelbinz0.de"
+      : "https://console.pixelbin.io",
+    CLIENT_KEY: isStaging ? resolvedStagingKey : resolvedProdKey,
+  };
+  window.PB_ENV = PB_ENV;
+  if (PB_DEBUG) console.info("[PB_ENV]", PB_ENV);
+
+  const buildUploadUrl = (orgId) => {
+    if (!orgId) return PB_ENV.API_URL;
+    try {
+      const url = new URL(PB_ENV.API_URL);
+      url.pathname = url.pathname.replace(
+        /\/upload\/direct$/,
+        `/org/${encodeURIComponent(orgId)}/upload/direct`
+      );
+      return url.toString();
+    } catch (e) {
+      if (PB_DEBUG)
+        console.error("[upload] failed to build org upload URL; using default", e);
+      return PB_ENV.API_URL;
+    }
+  };
+
+  const hexSha256 = (s) => CryptoJS.SHA256(s).toString();
+  const hexHmac = (k, s) => CryptoJS.HmacSHA256(s, k).toString();
+  const encRFC3986 = (s) =>
+    encodeURIComponent(s).replace(
+      /[!'()*]/g,
+      (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()
+    );
+
+  class PB_RequestSigner {
+    constructor(req) {
+      let u;
+      if (typeof req === "string") u = new URL(req, location.origin);
+      else if (req.host && req.path)
+        u = new URL(req.path, `https://${req.host}`);
+      else throw new TypeError("Invalid request");
+      this.r = {
+        method: req.method || (req.body ? "POST" : "GET"),
+        hostname: u.hostname,
+        port: u.port,
+        path: u.pathname,
+        headers: Object.assign({}, req.headers),
+        body: req.body || "",
+        query: Object.fromEntries(u.searchParams.entries()),
+      };
+      if (!this.r.headers.Host && !this.r.headers.host) {
+        this.r.headers.Host =
+          this.r.hostname + (this.r.port ? ":" + this.r.port : "");
+      }
+    }
+    _ts() {
+      return (this.__ts ||= new Date()
+        .toISOString()
+        .replace(/[:\-]|\.\d{3}/g, ""));
+    }
+    _canonHeaders() {
+      const h = this.r.headers,
+        IGN = {
+          authorization: 1,
+          connection: 1,
+          "x-amzn-trace-id": 1,
+          "user-agent": 1,
+          expect: 1,
+          "presigned-expires": 1,
+          range: 1,
+        };
+      const INC = ["x-ebg-.*", "host"];
+      return Object.keys(h)
+        .filter(
+          (k) =>
+            !IGN[k.toLowerCase()] &&
+            INC.some((rx) => new RegExp(rx, "i").test(k))
+        )
+        .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+        .map(
+          (k) =>
+            k.toLowerCase() + ":" + String(h[k]).trim().replace(/\s+/g, " ")
+        )
+        .join("\n");
+    }
+    _signedHeaders() {
+      const h = this.r.headers,
+        IGN = {
+          authorization: 1,
+          connection: 1,
+          "x-amzn-trace-id": 1,
+          "user-agent": 1,
+          expect: 1,
+          "presigned-expires": 1,
+          range: 1,
+        };
+      const INC = ["x-ebg-.*", "host"];
+      return Object.keys(h)
+        .map((k) => k.toLowerCase())
+        .filter((k) => !IGN[k] && INC.some((rx) => new RegExp(rx, "i").test(k)))
+        .sort()
+        .join(";");
+    }
+    _canonQuery() {
+      const q = this.r.query;
+      if (!q || !Object.keys(q).length) return "";
+      const parts = [];
+      Object.keys(q)
+        .sort()
+        .forEach((k) => {
+          const key = encRFC3986(k);
+          const vals = Array.isArray(q[k]) ? q[k] : [q[k]];
+          vals
+            .map(String)
+            .map(encRFC3986)
+            .sort()
+            .forEach((v) => parts.push(`${key}=${v}`));
+        });
+      return parts.join("&");
+    }
+    _canonPath() {
+      let p = this.r.path || "/";
+      if (/[^0-9A-Za-z;,/?:@&=+$\-_.!~*'()#%]/.test(p))
+        p = encodeURI(decodeURI(p));
+      const parts = p.split("/").reduce((acc, seg) => {
+        if (!seg || seg === ".") return acc;
+        if (seg === "..") acc.pop();
+        else acc.push(encRFC3986(seg));
+        return acc;
+      }, []);
+      return "/" + parts.join("/");
+    }
+    _canonRequest() {
+      const bodyHash = hexSha256(this.r.body || "");
+      const s = [
+        this.r.method || "GET",
+        this._canonPath(),
+        this._canonQuery(),
+        this._canonHeaders() + "\n",
+        this._signedHeaders(),
+        bodyHash,
+      ].join("\n");
+      if (PB_DEBUG) console.debug("[Signer] canonicalRequest\n", s);
+      return s;
+    }
+    _stringToSign() {
+      const sts = [this._ts(), hexSha256(this._canonRequest())].join("\n");
+      if (PB_DEBUG) console.debug("[Signer] stringToSign\n", sts);
+      return sts;
+    }
+    sign() {
+      const h = this.r.headers;
+      if (!h["x-ebg-param"]) h["x-ebg-param"] = this._ts();
+      delete h["x-ebg-signature"];
+      delete h["X-Ebg-Signature"];
+      const clientKeyCandidate =
+        typeof PB_ENV?.CLIENT_KEY === "string" ? PB_ENV.CLIENT_KEY.trim() : "";
+      const clientKey = clientKeyCandidate || "1234567";
+      if (
+        !clientKeyCandidate &&
+        PB_DEBUG &&
+        !PB_ENV.__warnedFallbackClientKey
+      ) {
+        PB_ENV.__warnedFallbackClientKey = true;
+        console.warn(
+          "[Signer] Using fallback client key; set data-client-key attributes for production values."
+        );
+      }
+      h["x-ebg-signature"] = "v1:" + hexHmac(clientKey, this._stringToSign());
+      if (PB_DEBUG) console.debug("[Signer] headers", h);
+      return this.r;
+    }
+  }
+
+  // reCAPTCHA (invisible)
+  let widgetId = null,
+    apiReady = null,
+    pendingResolve = null;
+  function loadRecaptcha() {
+    if (apiReady) return apiReady;
+    apiReady = new Promise((resolve, reject) => {
+      if (!document.getElementById("recaptcha-container")) {
+        console.error("[reCAPTCHA] #recaptcha-container not found");
+        reject(new Error("recaptcha-container missing"));
+        return;
+      }
+      const s = document.createElement("script");
+      s.src =
+        "https://www.google.com/recaptcha/api.js?render=explicit&onload=__pbRcOnLoad";
+      s.async = s.defer = true;
+      s.onerror = () => reject(new Error("Failed to load reCAPTCHA script"));
+      document.head.appendChild(s);
+      window.__pbRcOnLoad = () => {
+        try {
+          widgetId = grecaptcha.render("recaptcha-container", {
+            sitekey: PB_ENV.SITE_KEY,
+            size: "invisible",
+            callback: (token) => {
+              if (PB_DEBUG) console.debug("[reCAPTCHA] token", token);
+              if (pendingResolve) pendingResolve(token);
+              pendingResolve = null;
+              grecaptcha.reset(widgetId);
+            },
+          });
+          if (PB_DEBUG)
+            console.info("[reCAPTCHA] rendered, widgetId=", widgetId);
+          resolve();
+        } catch (e) {
+          console.error("[reCAPTCHA] render error", e);
+          reject(e);
+        }
+      };
+    });
+    return apiReady;
+  }
+
+  window.pbGetRecaptchaToken = () =>
+    loadRecaptcha().then(
+      () =>
+        new Promise((resolve, reject) => {
+          pendingResolve = resolve;
+          try {
+            if (PB_DEBUG) console.debug("[reCAPTCHA] executing");
+            grecaptcha.execute(widgetId);
+          } catch (e) {
+            pendingResolve = null;
+            console.error("[reCAPTCHA] execute error", e);
+            reject(e);
+          }
+        })
+    );
+
+  // direct upload (XHR)
+  window.pbDirectUpload = async function (
+    file,
+    requestId,
+    captchaCode,
+    orgId = null,
+    filenameOverride = true,
+    onProgress = () => {}
+  ) {
+    console.group("[pbDirectUpload]");
+    console.log(
+      "file:",
+      file?.name,
+      file?.type,
+      file?.size,
+      "requestId:",
+      requestId
+    );
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("filenameOverride", JSON.stringify(filenameOverride));
+    const datePart = new Date().toISOString().split("T")[0];
+    form.append("path", filenameOverride ? `__editor/${datePart}` : "");
+
+    const apiUrl = buildUploadUrl(orgId);
+    const { host, pathname, search } = new URL(apiUrl);
+    const signed = new PB_RequestSigner({
+      host,
+      method: "POST",
+      path: pathname + search,
+      headers: {},
+      body: "",
+    }).sign();
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", apiUrl);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader(
+        "x-ebg-signature",
+        signed.headers["x-ebg-signature"]
+      );
+      xhr.setRequestHeader("x-ebg-param", btoa(signed.headers["x-ebg-param"]));
+      if (captchaCode) xhr.setRequestHeader("captcha-code", captchaCode);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = (e.loaded / e.total) * 100;
+          if (PB_DEBUG)
+            console.debug("[upload] progress", pct.toFixed(1) + "%");
+          onProgress(pct, requestId);
+        }
+      };
+      xhr.onreadystatechange = () => {
+        if (PB_DEBUG)
+          console.debug(
+            "[upload] readyState",
+            xhr.readyState,
+            "status",
+            xhr.status
+          );
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          try {
+            const json = JSON.parse(xhr.response);
+            console.log("[upload] success", json);
+            console.groupEnd();
+            resolve(json);
+          } catch {
+            console.error("[upload] invalid JSON");
+            console.groupEnd();
+            reject({ status: 200, message: "Invalid JSON" });
+          }
+        } else {
+          let msg = "";
+          try {
+            msg = JSON.parse(xhr.response);
+          } catch {
+            msg = xhr.statusText;
+          }
+          console.error("[upload] error", xhr.status, msg);
+          console.groupEnd();
+          reject({ status: xhr.status, message: msg });
+        }
+      };
+      xhr.onerror = () => {
+        console.error("[upload] network error", xhr.status, xhr.statusText);
+        console.groupEnd();
+        reject({ status: xhr.status, message: xhr.statusText });
+      };
+      if (PB_DEBUG) console.info("[upload] POST", PB_ENV.API_URL);
+      xhr.send(form);
+    });
+  };
+
+  // redirect helper (image optional)
+  window.pbBuildStudioRedirect = function (toolRoute, imageUrl, prompt) {
+    const params = new URLSearchParams();
+    if (imageUrl) params.set("imageUrl", imageUrl);
+    if (prompt) params.set("transformationPrompt", prompt);
+    const redirectTo = params.toString()
+      ? `${toolRoute}?${params.toString()}`
+      : toolRoute;
+    const final = `${
+      PB_ENV.CONSOLE_BASE
+    }/choose-org?redirectTo=${encodeURIComponent(redirectTo)}`;
+    if (PB_DEBUG) console.info("[redirect]", final);
+    return final;
+  };
+})();
+
+(() => {
+  if (
+    typeof window.pbGetRecaptchaToken !== "function" ||
+    typeof window.pbDirectUpload !== "function" ||
+    typeof window.pbBuildStudioRedirect !== "function"
+  ) {
+    console.error(
+      "[integration] Core upload functions missing. Ensure CryptoJS + Core Upload load BEFORE this script."
+    );
+    return;
+  }
+
+  const PROGRESS_BLOCK = "[pb-indicator-block='upload-progress']";
+  const PROGRESS_TEXT = "[pb-indicator='progress-text']";
+  const showProgress = () => {
+    const el = document.querySelector(PROGRESS_BLOCK);
+    if (el) el.style.display = "flex";
+  };
+  const hideProgress = () => {
+    const el = document.querySelector(PROGRESS_BLOCK);
+    if (el) el.style.display = "none";
+  };
+  const setProgress = (p) => {
+    const t = document.querySelector(PROGRESS_TEXT);
+    if (t) t.textContent = `${Math.round(p)}%`;
+  };
+  const flashErrorInline = (msg) => {
+    console.error("[integration] ", msg);
+    const box = document.getElementById("uploadError");
+    const txt = document.getElementById("uploadErrorText");
+    if (box && txt) {
+      txt.textContent = msg;
+      box.style.display = "block";
+    }
+  };
+
+  async function handleSubmit(detail) {
+    console.group("[aiSearchSubmit]");
+    console.log("detail:", detail);
+
+    const tool = detail.tool || "ai-editor";
+    const prompt = (detail.prompt || "").trim();
+    const files = Array.isArray(detail.files) ? detail.files : [];
+    const needs = !!detail.needsImage;
+
+    if (!prompt) {
+      flashErrorInline("Please enter a prompt.");
+      console.groupEnd();
+      return;
+    }
+
+    // Case 1: needs image but none provided
+    const externalUrl = detail.externalImageUrl;
+
+    if (needs && files.length === 0 && !externalUrl) {
+      flashErrorInline("This prompt needs an image. Please upload one.");
+      console.groupEnd();
+      return;
+    }
+
+    // Case 2: external URL only
+    if (externalUrl && files.length === 0) {
+      const studioRoute = `/studio/${tool}`;
+      const redirectURL = pbBuildStudioRedirect(studioRoute, externalUrl, prompt);
+      console.log("[step] redirecting (external image url)", redirectURL);
+      window.location.href = redirectURL;
+      console.groupEnd();
+      return;
+    }
+
+    // Case 3: have a file -> upload then redirect
+    const file = files[0];
+    if (!file) {
+      flashErrorInline("No file selected.");
+      console.groupEnd();
+      return;
+    }
+
+    try {
+      showProgress();
+      setProgress(0);
+
+      console.log("[step] get reCAPTCHA token");
+      const captcha = await pbGetRecaptchaToken();
+      if (!captcha) {
+        throw new Error("reCAPTCHA token missing");
+      }
+      console.log("[ok] captcha");
+
+      console.log("[step] upload file");
+      const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) =>
+        setProgress(pct)
+      );
+      if (!resp?.url) throw new Error("Upload succeeded but no URL returned");
+      console.log("[ok] upload ->", resp.url);
+
+      const studioRoute = `/studio/${tool}`;
+      const redirectURL = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
+      console.log("[step] redirecting (with image)", redirectURL);
+      window.location.href = redirectURL;
+    } catch (err) {
+      console.error("[fail]", err);
+      flashErrorInline(err?.message || "Upload failed. Please try again.");
+    } finally {
+      hideProgress();
+      console.groupEnd();
+    }
+  }
+
+  window.addEventListener("aiSearchSubmit", (e) => {
+    if (!e?.detail) {
+      console.warn("[aiSearchSubmit] missing detail");
+      return;
+    }
+    handleSubmit(e.detail);
+  });
+})();

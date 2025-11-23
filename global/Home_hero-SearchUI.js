@@ -1,28 +1,24 @@
 
-
 document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("searchContainer");
-  if (!container) {
-    console.error("[UI] #searchContainer not found");
-    return;
-  }
+  if (!container) { console.error("[UI] #searchContainer not found"); return; }
 
   const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
   const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
   const HINT_ON_SUBMIT_ONLY = true;
 
-  // Loader image shown in the thumbnail until the real image finishes loading
-  const LOADER_IMG = "https://cdn.prod.website-files.com/673193e0642e6ad25696fcd4/6921902dc9c1daf39440e804_image%20(8).png";
+  // Loader image (will render INSIDE the thumbnail slot only)
+  const LOADER_URL = "https://cdn.prod.website-files.com/673193e0642e6ad25696fcd4/6921902dc9c1daf39440e804_image%20(8).png";
 
-  const IMAGE_KEYWORDS = ["remove", "erase", "delete", "replace", "edit", "upscale"];
-  const keywordNeedsImage = (text) => {
+  // Only require an image if the FIRST word is one of these actions
+  const ACTION_FIRST_WORDS = ["remove","erase","delete","replace","edit","upscale"];
+  function keywordNeedsImage(text) {
     if (!text) return false;
-    const t = text.toLowerCase();
-    return IMAGE_KEYWORDS.some((k) =>
-      new RegExp(`\\b${k.replace(/\s+/g, "\\s+")}\\b`, "i").test(t)
-    );
-  };
+    const first = (text.trim().toLowerCase().match(/^[^\p{L}\p{N}]*(\p{L}+)/u) || [,""])[1];
+    return ACTION_FIRST_WORDS.includes(first);
+  }
 
+  // DOM refs
   const form = document.getElementById("searchForm");
   const formContent = document.getElementById("formContent");
   const imagesSection = document.getElementById("imagesSection");
@@ -36,102 +32,168 @@ document.addEventListener("DOMContentLoaded", () => {
   const fileInput = document.getElementById("fileInput");
   const charCounter = document.getElementById("charCounter");
 
+  // Image constraints
   const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
   const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"];
   const MAX_MB = 25;
   const MAX_IMAGES = 1;
 
+  // State
+  const state = {
+    inputValue: "",
+    images: [],                // [{ file|null, url, slideKey?, source? }]
+    active: false,
+    mode: "empty",
+    maxChars: MAX_CHARS,
+    loadingImage: false,       // only while a thumbnail-slot loader is active
+    isGenerating: false,       // "Generate" -> "Generating…"
+  };
+
+  function setGenerating(on) { state.isGenerating = !!on; updateUI(false); }
+
+  // ===== Live DOM sync helpers =====
+  function activeEditor() {
+    if (textArea && !textArea.classList.contains("hidden")) return textArea;
+    return textInput;
+  }
+  function getLivePrompt() {
+    const el = activeEditor();
+    return el ? String(el.value || "") : state.inputValue || "";
+  }
+  function syncPromptFromDOM() {
+    const live = getLivePrompt();
+    if (live !== state.inputValue) {
+      state.inputValue = live;
+      updateState();
+    }
+  }
+  // ===== Submit-time full prompt restore (fix truncation) =====
+  function truncateForUI(text, max = 64) {
+    if (!text) return "";
+    if (text.length <= max) return text;
+    return text.substring(0, max).trim() + "...";
+  }
+  function resolvePromptForSubmit(liveValue) {
+    try {
+      const raw = window.aiPhotoCarousel?.getStoredPrompt?.() || "";
+      if (!raw) return liveValue;
+
+      const truncated = truncateForUI(raw, 64);
+      if (liveValue === truncated) return raw;
+
+      if (/\.\.\.$/.test(liveValue)) {
+        const base = liveValue.replace(/\.\.\.$/, "").trim();
+        if (base && raw.startsWith(base)) return raw;
+      }
+    } catch {}
+    return liveValue;
+  }
+  // ========================================
+
+  // Validation
   const isValidImageFile = (f) => {
     if (!f) return false;
     const ext = (f.name.split(".").pop() || "").toLowerCase();
-    return (
-      f.type.startsWith("image/") &&
-      (ALLOWED_TYPES.includes(f.type) || ALLOWED_EXTS.includes(ext)) &&
-      f.size <= MAX_MB * 1024 * 1024
-    );
+    return f.type.startsWith("image/") &&
+           (ALLOWED_TYPES.includes(f.type) || ALLOWED_EXTS.includes(ext)) &&
+           f.size <= MAX_MB * 1024 * 1024;
   };
 
-  // Convert external image URL to a File so upload path is unified
+  // Convert external URL → File (for upload path)
   async function externalUrlToFile(url, slideKey = "carousel") {
     const res = await fetch(url, { mode: "cors", credentials: "omit" });
     if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
     const blob = await res.blob();
-
     const mime = blob.type || "image/jpeg";
-    const ext =
-      mime === "image/png"  ? "png"  :
-      mime === "image/webp" ? "webp" : "jpg";
-
+    const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
     const safeKey = (slideKey || "carousel").toLowerCase().replace(/[^\w-]+/g, "-");
     return new File([blob], `carousel-${safeKey}-${Date.now()}.${ext}`, { type: mime });
   }
 
-  function hasExternalImage(url, slideKey) {
-    return state.images.some(
-      (x) => x.url === url || (slideKey && x.slideKey === slideKey)
-    );
+  // Image preloader
+  function preloadImage(url) {
+    return new Promise((resolve) => {
+      const i = new Image();
+      i.onload = () => resolve(true);
+      i.onerror = () => resolve(false);
+      i.src = url;
+    });
   }
 
-  function addExternalImage(url, slideKey, source = "carousel") {
+  // ===== Thumbnail-slot loader (ONLY where the image will appear) =====
+  function createSlotLoader() {
+    if (!imagesSection) return null;
+    imagesSection.classList.remove("hidden");
+
+    const slot = document.createElement("div");
+    slot.className = "image-thumbnail loading-slot";
+    Object.assign(slot.style, {
+      position: "relative",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.04)",
+      borderRadius: "8px",
+      minWidth: "72px",
+      minHeight: "72px",
+      overflow: "hidden",
+    });
+
+    const spin = document.createElement("img");
+    spin.src = LOADER_URL;
+    spin.alt = "Loading…";
+    Object.assign(spin.style, { width: "48px", height: "48px", objectFit: "contain", opacity: "0.85" });
+    slot.appendChild(spin);
+
+    imagesSection.appendChild(slot);
+    state.loadingImage = true;
+    updateUI(false);
+    return slot;
+  }
+  function removeSlotLoader(slot) {
+    if (slot && slot.parentNode) slot.parentNode.removeChild(slot);
+    state.loadingImage = false;
+    updateUI(false);
+  }
+  // ===================================================================
+
+  // Helpers for images
+  function hasExternalImage(url, slideKey) {
+    return state.images.some(x => x.url === url || (slideKey && x.slideKey === slideKey));
+  }
+
+  async function addExternalImage(url, slideKey, source = "carousel") {
     if (!url) return;
-
-    const userCount = state.images.filter(x => x.source === "user").length;
-
-    // Respect user limit; carousel never overrides user slot
-    if (source !== "user" && userCount >= MAX_IMAGES) return;
-    if (source === "user" && userCount >= MAX_IMAGES) return;
-
+    if (state.images.length >= MAX_IMAGES) return;
     if (hasExternalImage(url, slideKey)) return;
 
-    state.images.push({ file: null, url, slideKey, source, loading: true });
-    onThumbLoadStart();
+    const slot = createSlotLoader();
+    await preloadImage(url);
+    if (slot) removeSlotLoader(slot);
+
+    state.images.push({ file: null, url, slideKey, source });
     updateState();
     updateAddButtonState();
   }
 
   function clearImagesByScope(scope = "all") {
     if (scope === "carousel") {
-      // drop only carousel-injected items
-      const kept = [];
-      state.images.forEach((x) => {
-        if (x.source === "carousel") {
-          if (x.loading) onThumbLoadDone();
-        } else {
-          kept.push(x);
-        }
-      });
-      state.images = kept;
+      state.images = state.images.filter((x) => x.source !== "carousel");
     } else {
-      // drop all, revoke blobs for user uploads
-      state.images.forEach((x) => {
-        if (x.loading) onThumbLoadDone();
-        if (x.file && x.url?.startsWith("blob:")) URL.revokeObjectURL(x.url);
-      });
+      state.images.forEach((x) => { if (x.file && x.url?.startsWith("blob:")) URL.revokeObjectURL(x.url); });
       state.images = [];
     }
     updateState();
     updateAddButtonState();
   }
 
-  const state = {
-    inputValue: "",
-    images: [],
-    active: false,
-    mode: "empty",
-    maxChars: MAX_CHARS,
-    pendingImages: 0,      // number of thumbnails still loading
-    submitting: false,     // prevent double submits
-  };
-
-  function onThumbLoadStart() {
-    state.pendingImages++;
-    updateUI();
-  }
-  function onThumbLoadDone() {
-    if (state.pendingImages > 0) state.pendingImages--;
-    updateUI();
+  // Textarea rows rule: 2 rows if image present, else 5
+  function applyTextAreaRows() {
+    if (!textArea) return;
+    textArea.rows = state.images.length > 0 ? 2 : 5;
   }
 
+  // Responsive tweaks
   const setMobileStyles = () => {
     const isMobile = window.innerWidth < 768;
     container.classList.toggle("mobile", isMobile);
@@ -140,14 +202,9 @@ document.addEventListener("DOMContentLoaded", () => {
     generateButton?.classList.toggle("mobile-icon", isMobile);
   };
 
-  const showImageHint = () => {
-    tooltip?.classList.add("show");
-    addButton?.classList.add("active");
-  };
-  const hideImageHint = () => {
-    tooltip?.classList.remove("show");
-    addButton?.classList.remove("active");
-  };
+  // Hints and counters
+  const showImageHint = () => { tooltip?.classList.add("show"); addButton?.classList.add("active"); };
+  const hideImageHint = () => { tooltip?.classList.remove("show"); addButton?.classList.remove("active"); };
 
   const updateCharCounter = () => {
     const len = state.inputValue.length;
@@ -159,104 +216,58 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function updateAddButtonState() {
-    const userCount = state.images.filter(x => x.source === "user").length;
-    const atLimit = userCount >= MAX_IMAGES;
-
+    const blocked = state.images.length >= MAX_IMAGES || state.loadingImage || state.isGenerating;
     if (addButton) {
-      const disabled = atLimit || state.submitting;
-      addButton.disabled = disabled;
-      addButton.classList.toggle("is-disabled", disabled);
-      addButton.setAttribute("aria-disabled", String(disabled));
+      addButton.disabled = blocked;
+      addButton.classList.toggle("is-disabled", blocked);
+      addButton.setAttribute("aria-disabled", String(blocked));
     }
-    if (atLimit) hideImageHint();
+    if (state.images.length >= MAX_IMAGES) hideImageHint();
   }
 
-  // --- Thumbnails renderer (explicit sizes; no re-entrant state updates) ---
+  // Render thumbnails
   const renderImages = () => {
     if (!imagesSection) return;
-
-    // make sure the container is visibly laid out
-    imagesSection.classList.remove("hidden");
-    imagesSection.style.display = "flex";
-    imagesSection.style.gap = "8px";
-    imagesSection.style.flexWrap = "wrap";
-
     imagesSection.innerHTML = "";
-
     state.images.forEach((img, idx) => {
       const div = document.createElement("div");
       div.className = "image-thumbnail";
-      if (img.loading) div.classList.add("loading");
+      div.style.backgroundImage = `url(${img.url})`;
+      div.style.backgroundSize = "cover";
+      div.style.backgroundPosition = "center";
+      div.style.borderRadius = "8px";
+      div.style.minWidth = "72px";
+      div.style.minHeight = "72px";
+      div.style.position = "relative";
       if (img.source)   div.dataset.source   = img.source;
       if (img.slideKey) div.dataset.slideKey = img.slideKey;
       div.dataset.url = img.url;
-      // explicit size so it actually shows
-      div.style.cssText = "width:64px;height:64px;position:relative;border-radius:12px;overflow:hidden;background:#f4f4f5;";
-
-      // Visible preview: start with loader image
-      const pic = document.createElement("img");
-      pic.alt = "preview";
-      pic.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
-      pic.src = LOADER_IMG;
-
-      // Preload actual image, then swap
-      const preload = new Image();
-      preload.onload = () => {
-        pic.src = img.url;
-        if (img.loading) {
-          img.loading = false;
-          div.classList.remove("loading");
-          onThumbLoadDone();
-        }
-      };
-      preload.onerror = () => {
-        // Keep loader; mark as done and show small badge
-        if (img.loading) {
-          img.loading = false;
-          div.classList.remove("loading");
-          onThumbLoadDone();
-        }
-        const badge = document.createElement("div");
-        badge.className = "image-badge";
-        badge.textContent = "Unsupported Format";
-        badge.style.cssText = "position:absolute;bottom:6px;left:6px;right:6px;padding:4px 6px;border-radius:8px;background:#fff;border:1px solid #e5e7eb;font:500 11px/1.2 Inter,system-ui,sans-serif;color:#6b7280;text-align:center;";
-        div.appendChild(badge);
-      };
-      preload.src = img.url;
 
       const close = document.createElement("button");
       close.type = "button";
       close.className = "image-close";
       close.setAttribute("aria-label", "Remove image");
       close.textContent = "×";
-      close.style.cssText = "position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:10px;border:none;background:rgba(0,0,0,.5);color:#fff;cursor:pointer;line-height:18px;text-align:center;";
+      Object.assign(close.style, {
+        position: "absolute", top: "4px", right: "6px",
+        background: "rgba(0,0,0,0.55)", color: "#fff",
+        border: "0", borderRadius: "12px", width: "20px", height: "20px", lineHeight: "20px", cursor: "pointer"
+      });
       close.addEventListener("click", () => {
         if (state.images[idx]?.file && state.images[idx]?.url?.startsWith("blob:")) {
           URL.revokeObjectURL(state.images[idx].url);
         }
-        if (state.images[idx]?.loading) onThumbLoadDone();
         state.images.splice(idx, 1);
-        // re-render without calling updateState() to avoid loops
-        renderImages();
-        // keep controls in sync
+        updateState();
         updateAddButtonState();
-        // adjust rows after removal
-        if (textArea && !textArea.classList.contains("hidden")) {
-          textArea.rows = desiredRows();
-        }
       });
 
-      div.appendChild(pic);
       div.appendChild(close);
       imagesSection.appendChild(div);
     });
-
-    // adjust rows after thumbnails render
-    if (textArea && !textArea.classList.contains("hidden")) {
-      textArea.rows = desiredRows();
-    }
   };
 
+  // Layout switching without animation jank
   function switchLayoutWithoutAnimation(multi) {
     const els = [form, formContent, toolbar];
     const prevTransitions = els.map((el) => (el ? el.style.transition : ""));
@@ -266,40 +277,22 @@ document.addEventListener("DOMContentLoaded", () => {
     form?.classList.toggle("single-line", !multi);
     container?.classList.toggle("multi-line", multi);
     container?.classList.toggle("single-line", !multi);
-
     formContent?.classList.toggle("single-line", !multi);
     toolbar?.classList.toggle("single-line", !multi);
 
-    form?.offsetHeight; // force reflow
-    requestAnimationFrame(() => {
-      els.forEach((el, i) => { if (el) el.style.transition = prevTransitions[i] || ""; });
-    });
+    form?.offsetHeight;
+    requestAnimationFrame(() => { els.forEach((el, i) => { if (el) el.style.transition = prevTransitions[i] || ""; }); });
   }
 
-  // --- Control multiline rows based on thumbnails ---
-  // If no image thumbnails -> 5 rows (to keep container height)
-  // If there are thumbnails -> 2 rows
-  function hasAnyThumbnails() {
-    return !!(imagesSection && imagesSection.querySelector('.image-thumbnail'));
-  }
-  function desiredRows() {
-    return hasAnyThumbnails() ? 2 : 5;
-  }
-
+  // UI update
   const updateUI = (flipLayout = false) => {
-    const wasMulti = form?.classList.contains("multi-line");
-    const stickyMulti = state.active && wasMulti; // keep multiline open while focused
-    const multi = state.mode === "image-attached" || state.mode === "multiline" || stickyMulti;
-
+    const multi = state.mode === "multiline" || state.mode === "image-attached";
     if (flipLayout) switchLayoutWithoutAnimation(multi);
 
     if (multi) {
       textInput?.classList.add("hidden");
       textArea?.classList.remove("hidden");
-      if (textArea) {
-        textArea.value = state.inputValue;
-        textArea.rows = desiredRows();
-      }
+      if (textArea) { textArea.value = state.inputValue; applyTextAreaRows(); }
     } else {
       textInput?.classList.remove("hidden");
       textArea?.classList.add("hidden");
@@ -307,7 +300,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (imagesSection) {
-      if (state.images.length > 0) {
+      if (state.images.length > 0 || state.loadingImage) {
+        imagesSection.classList.remove("hidden");
         renderImages();
       } else {
         imagesSection.classList.add("hidden");
@@ -315,23 +309,31 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    applyTextAreaRows();
+
     const promptPresent = state.inputValue.trim().length > 0;
     const overLimit = state.inputValue.length > state.maxChars;
-    const canGenerate = promptPresent && !overLimit && state.pendingImages === 0 && !state.submitting;
+    const canGenerate = promptPresent && !overLimit && !state.loadingImage && !state.isGenerating;
 
     generateButton?.classList.toggle("active", canGenerate);
     generateButton?.classList.toggle("inactive", !canGenerate);
     if (generateButton) {
       generateButton.disabled = !canGenerate;
-      generateButton.setAttribute("aria-disabled", String(!canGenerate));
+      generateButton.classList.toggle("is-generating", state.isGenerating);
+      generateButton.setAttribute("aria-busy", String(state.isGenerating));
+      if (generateText) {
+        generateText.textContent = state.isGenerating ? "Generating…" : "Generate";
+      } else {
+        generateButton.textContent = state.isGenerating ? "Generating…" : "Generate";
+      }
     }
 
     updateAddButtonState();
   };
 
+  // State recompute
   const updateState = () => {
     const prevMode = state.mode;
-
     if (state.images.length > 0) state.mode = "image-attached";
     else if (state.inputValue.length > 67) state.mode = "multiline";
     else if (state.inputValue.length > 0) state.mode = "filled";
@@ -341,145 +343,78 @@ document.addEventListener("DOMContentLoaded", () => {
     const layoutChanged = prevMode !== state.mode;
     updateUI(layoutChanged);
     updateCharCounter();
-
-    if (textArea && !textArea.classList.contains("hidden")) {
-      textArea.rows = desiredRows();
-    }
+    applyTextAreaRows();
   };
 
-  function setGenerating(on) {
-    state.submitting = !!on;
-
-    if (generateButton) {
-      const label = generateButton.querySelector(".generate-text");
-      if (label) label.textContent = on ? "Generating..." : "Generate";
-      generateButton.classList.toggle("loading", on);
-      generateButton.disabled = true;
-      generateButton.setAttribute("aria-busy", String(on));
-      generateButton.setAttribute("aria-disabled", "true");
-    }
-
-    // Lock addButton while submitting
-    updateAddButtonState();
-
-    // Soft-disable text inputs during submit (optional)
-    if (on) {
-      textInput?.setAttribute("readonly", "readonly");
-      textArea?.setAttribute("readonly", "readonly");
-    } else {
-      textInput?.removeAttribute("readonly");
-      textArea?.removeAttribute("readonly");
-    }
-  }
-
+  // Events
   window.addEventListener("resize", setMobileStyles);
   setMobileStyles();
 
-  textInput?.addEventListener("input", (e) => {
-    state.inputValue = e.target.value;
-    updateState();
-  });
-  textInput?.addEventListener("focus", () => {
-    state.active = true;
-    updateState();
-  });
+  textInput?.addEventListener("input", (e) => { state.inputValue = e.target.value; updateState(); });
+  textInput?.addEventListener("focus", () => { state.active = true; updateState(); });
+  textInput?.addEventListener("blur", () => { if (!state.inputValue && state.images.length === 0) { state.active = false; updateState(); } });
 
-  textArea?.addEventListener("input", (e) => {
-    state.inputValue = e.target.value;
-    updateState();
-  });
-  textArea?.addEventListener("focus", () => {
-    state.active = true;
-    updateState();
-  });
+  textArea?.addEventListener("input", (e) => { state.inputValue = e.target.value; applyTextAreaRows(); updateState(); });
+  textArea?.addEventListener("focus", () => { state.active = true; updateState(); });
+  textArea?.addEventListener("blur", () => { if (!state.inputValue && state.images.length === 0) { state.active = false; updateState(); } });
 
-  // When either input blurs and there is no content or images, drop active mode
-  function handleBlur() {
-    if (!state.inputValue && state.images.length === 0) {
-      state.active = false;
-      updateState();
-    }
-  }
-  textArea?.addEventListener("blur", handleBlur);
-  textInput?.addEventListener("blur", handleBlur);
+  // IME-safe syncing and Enter-to-submit
+  [textInput, textArea].forEach(el => {
+    el?.addEventListener("compositionend", () => { syncPromptFromDOM(); });
+    el?.addEventListener("change", () => { syncPromptFromDOM(); });
+    el?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
+        e.preventDefault();
+        generateButton?.click();
+      }
+    });
+  });
 
   addButton?.addEventListener("click", () => {
-    const userCount = state.images.filter(x => x.source === "user").length;
-    if (userCount >= MAX_IMAGES) {
-      flashError(`Maximum ${MAX_IMAGES} images allowed.`);
-      return;
-    }
-    if (state.submitting) return;
+    if (state.images.length >= MAX_IMAGES) { flashError(`Maximum ${MAX_IMAGES} images allowed.`); return; }
     fileInput?.click();
   });
-  addButton?.addEventListener("mouseenter", () => {
-    addButton.classList.add("active");
-    if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show");
-  });
-  addButton?.addEventListener("mouseleave", () => {
-    addButton.classList.remove("active");
-    tooltip?.classList.remove("show");
-  });
+  addButton?.addEventListener("mouseenter", () => { addButton.classList.add("active"); if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show"); });
+  addButton?.addEventListener("mouseleave", () => { addButton.classList.remove("active"); tooltip?.classList.remove("show"); });
 
-  fileInput?.addEventListener("change", (e) => {
+  // File upload → show loader in the thumbnail slot only
+  fileInput?.addEventListener("change", async (e) => {
     const incoming = Array.from(e.target.files || []);
     if (!incoming.length) return;
 
-    const userCount = state.images.filter(x => x.source === "user").length;
-    const remaining = Math.max(0, MAX_IMAGES - userCount);
+    const remaining = Math.max(0, MAX_IMAGES - state.images.length);
     const selected = incoming.slice(0, remaining);
     const ignored = incoming.length - selected.length;
 
     for (const f of selected) {
-      if (!isValidImageFile(f)) {
-        flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`);
-        continue;
-      }
-      const url = URL.createObjectURL(f);
-      // User upload wins → clear injected thumbnails
-      clearImagesByScope("carousel");
-      state.images.push({ file: f, url, source: "user", loading: true });
-      onThumbLoadStart();
-      try { window.aiPhotoCarousel?.markUserUpload?.(url); } catch {}
+      if (!isValidImageFile(f)) { flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); continue; }
+      const slot = createSlotLoader();
+      try {
+        const url = URL.createObjectURL(f);
+        await preloadImage(url);
+        if (slot) removeSlotLoader(slot);
+        state.images.push({ file: f, url });
+        updateState();
+        updateAddButtonState();
+      } finally {}
     }
-
-    if (ignored > 0) {
-      flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
-    }
-
-    updateState();
-    updateAddButtonState();
+    if (ignored > 0) flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
     e.target.value = "";
   });
 
-  // Submit handler
+  // Generate click — NO overlay; only button text/state changes
   generateButton?.addEventListener("click", (e) => {
     e.preventDefault();
-    if (state.submitting) return;
 
-    // Block generate while thumbnails pending
-    if (state.pendingImages > 0) {
-      const tip = tooltip?.querySelector(".tooltip-text");
-      if (tip) {
-        const restore = tip.textContent;
-        tip.textContent = "File Upload Pending";
-        tooltip.classList.add("show");
-        setTimeout(() => {
-          tooltip.classList.remove("show");
-          tip.textContent = restore || "Upload image";
-        }, 1200);
-      }
-      return;
-    }
-
-    const prompt = state.inputValue.trim();
+    // Ensure latest text, then restore full prompt if carousel truncated it
+    syncPromptFromDOM();
+    const promptLive = state.inputValue.trim();
+    const prompt = resolvePromptForSubmit(promptLive);
     const needs = keywordNeedsImage(prompt);
 
     if (!prompt) { flashError("Please enter a prompt."); return; }
-    if (prompt.length > state.maxChars) {
-      flashError(`Prompt too long. Max ${state.maxChars} characters.`);
-      return;
-    }
+    if (prompt.length > state.maxChars) { flashError(`Prompt too long. Max ${state.maxChars} characters.`); return; }
+    if (state.loadingImage) { flashError("Please wait for the image to finish loading."); return; }
 
     const files = state.images.map(x => x.file).filter(Boolean);
     const externalEntry = state.images.find(x => !x.file);
@@ -494,42 +429,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const studioRoute = `/studio/${TOOL_NAME}`;
+    setGenerating(true); // switch button to "Generating…"
 
-    // Prompt only
+    // Prompt-only path
     if (!needs && files.length === 0 && !externalImageUrl) {
-      setGenerating(true);
-      try {
-        const redirectURL = pbBuildStudioRedirect(studioRoute, undefined, prompt);
-        window.location.href = redirectURL;
-      } catch (err) {
-        console.error("[redirect fail]", err);
-        flashError("Navigation failed. Please try again.");
-        setGenerating(false);
-      }
+      const redirectURL = pbBuildStudioRedirect(studioRoute, undefined, prompt);
+      window.location.href = redirectURL;
       return;
     }
 
-    // Unified upload path
+    // Image path
     (async () => {
       try {
-        setGenerating(true);
-        try { showProgress?.(); setProgress?.(0); } catch {}
-
         let file = files[0];
         if (!file && externalImageUrl) {
           file = await externalUrlToFile(externalImageUrl, externalSlideKey);
-          if (!isValidImageFile(file)) {
-            throw new Error("Only JPG, JPEG, PNG, WEBP up to 25 MB are allowed.");
-          }
+          if (!isValidImageFile(file)) { flashError("Only JPG, JPEG, PNG, WEBP up to 25 MB are allowed."); setGenerating(false); return; }
         }
-        if (!file) throw new Error("No file selected.");
+        if (!file) { flashError("No file selected."); setGenerating(false); return; }
+
+        try { showProgress?.(); setProgress?.(0); } catch {}
 
         const captcha = await pbGetRecaptchaToken();
         if (!captcha) throw new Error("reCAPTCHA token missing");
 
-        const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) => {
-          try { setProgress?.(pct); } catch {}
-        });
+        const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) => { try { setProgress?.(pct); } catch {} });
         if (!resp?.url) throw new Error("Upload succeeded but no URL returned");
 
         const redirectURL = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
@@ -545,41 +469,38 @@ document.addEventListener("DOMContentLoaded", () => {
     })();
   });
 
+  // Error UI
   function flashError(msg) {
     console.error(msg);
     const box = document.getElementById("uploadError");
     const txt = document.getElementById("uploadErrorText");
-    if (box && txt) {
-      txt.textContent = msg;
-      box.style.display = "block";
-    }
+    if (box && txt) { txt.textContent = msg; box.style.display = "block"; }
     form?.classList.add("error");
     setTimeout(() => form?.classList.remove("error"), 1200);
   }
 
-  // Chips API
+  // Public API for carousel/chips
   window.searchFeature = {
     setPrompt(text) {
       const next = text || "";
       state.inputValue = next;
-
-      // reflect into visible control
-      if (form?.classList.contains("multi-line")) {
-        if (textArea) textArea.value = next;
-      } else {
-        if (textInput) textInput.value = next;
-      }
-
+      if (form?.classList.contains("multi-line")) { if (textArea) textArea.value = next; }
+      else { if (textInput) textInput.value = next; }
       updateState();
     },
-    setExternalImage(url, slideKey) {
-      addExternalImage(url, slideKey, "carousel");
-    },
-    clearImages(scope = "all") {
-      clearImagesByScope(scope);
-    },
+    setExternalImage(url, slideKey) { addExternalImage(url, slideKey, "carousel"); },
+    clearImages(scope = "all") { clearImagesByScope(scope); },
   };
+
+  document.addEventListener("click", (e) => {
+    const pill = e.target.closest(".pb_input_pill");
+    if (!pill) return;
+    const prompt = (pill.dataset.prompt || pill.querySelector(".gen_text")?.textContent || "").trim();
+    if (!prompt) return;
+    window.searchFeature.setPrompt(prompt);
+  });
 });
+
 
 
 

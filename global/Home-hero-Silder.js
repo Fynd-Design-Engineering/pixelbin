@@ -1,5 +1,7 @@
 /**
  * AI PHOTO EDITOR CAROUSEL - Webflow Version
+ * Focus-zoom works on DESKTOP ONLY (no zoom on mobile). Spacing prevents overlap.
+ * Fully self-contained replacement. Drop in for your existing script.
  */
 
 const DEBUG = false;
@@ -48,7 +50,7 @@ let sliderTrack;
 
 let autoInterval = null;
 let isUserActive = false;
-const ROTATION_DELAY = 3000;
+const ROTATION_DELAY = 2000;
 
 let storedPrompt = '';
 let isPromptExpanded = false;
@@ -72,6 +74,8 @@ let isDragging = false;
 let dragStartX = 0;
 let dragStartOffset = 0;
 
+let suppressNextBlur = false;
+
 // Focus-zoom state & tuning (applies on DESKTOP only)
 let isFocusZoomed = false;
 const FOCUS_SCALE = 1;          // 1.3x scale on center card
@@ -79,7 +83,9 @@ const FOCUS_SPREAD = 4;        // neighbors push outward to make room
 const FOCUS_TRANSITION_MS = 750;  // scale/landscape transition
 
 // Helper: zoom is active only when not mobile and focus-zoom flag is on
-const zoomActive = () => (!isMobile && isFocusZoomed);
+// Zoom ONLY on desktop and ONLY in MULTILINE mode
+const zoomActive = () => (!isMobile && isFocusZoomed && !isSingleLineMode);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // MODES
@@ -322,12 +328,12 @@ function getDimsFromDistance(ad) {
       : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };   // desktop portrait
   } else if (ad < 1.5) {
     return isMobile
-      ? { width: 240, height: 300, opacity: 0.5, yOffset: 0, shadow: false }
-      : { width: 272, height: 340, opacity: 0.5, yOffset: 0, shadow: false };
+      ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
+      : { width: 272, height: 340, opacity: 0.2, yOffset: 0, shadow: false };
   }
   return isMobile
-    ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
-    : { width: 208, height: 260, opacity: 0.2, yOffset: 0, shadow: false };
+    ? { width: 240, height: 300, opacity: 0.05, yOffset: 0, shadow: false }
+    : { width: 208, height: 260, opacity: 0.05, yOffset: 0, shadow: false };
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -355,69 +361,74 @@ function createSlideHTML(slide, dimensions) {
 }
 
 function initCarousel() {
-  log('🔄 Initializing carousel (9 nodes)…');
+  log('🔄 Initializing carousel...');
   sliderTrack = q('slider-track');
   if (!sliderTrack) { console.error('❌ Slider track not found!'); return; }
 
   sliderTrack.innerHTML = '';
   slideElements = [];
 
-  // Build exactly one set and keep absoluteIndex mutable (recycled later)
-  slides.forEach((slide, idx) => {
-    const absoluteIndex = idx; // IMPORTANT: mutable; recycled in updatePositions()
-    const dims = getDimsFromDistance(Math.abs(getSignedDistance(absoluteIndex, 0)));
+  for (let set = 0; set < 3; set++) {
+    slides.forEach((slide, idx) => {
+      const absoluteIndex = -slides.length + set * slides.length + idx;
+      const dims = getDimsFromDistance(Math.abs(getSignedDistance(absoluteIndex, 0)));
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'slide-card-wrapper';
-    wrapper.dataset.absoluteIndex = String(absoluteIndex);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'slide-card-wrapper';
+      wrapper.dataset.absoluteIndex = String(absoluteIndex);
 
-    const cardContainer = document.createElement('div');
-    cardContainer.style.cssText = 'width:100%;height:100%;';
-    cardContainer.innerHTML = createSlideHTML(slide, dims);
+      const cardContainer = document.createElement('div');
+      cardContainer.style.cssText = 'width:100%;height:100%;';
+      cardContainer.innerHTML = createSlideHTML(slide, dims);
 
-    wrapper.appendChild(cardContainer);
-    sliderTrack.appendChild(wrapper);
+      wrapper.appendChild(cardContainer);
+      sliderTrack.appendChild(wrapper);
 
-    const slideCard  = cardContainer.querySelector('.slide-card');
-    const slideImage = cardContainer.querySelector('.slide-card-single-img');
+      const slideCard  = cardContainer.querySelector('.slide-card');
+      const slideImage = cardContainer.querySelector('.slide-card-single-img');
 
-    slideElements.push({
-      wrapper,
-      cardContainer,
-      slide,
-      absoluteIndex, // mutable
-      slideCard,
-      slideImage
+      slideElements.push({
+        wrapper,
+        cardContainer,
+        slide,
+        absoluteIndex,
+        slideCard,
+        slideImage
+      });
+
+      // --- Assign optimized image variant + priorities ---
+      if (slideImage) {
+        // store the unmodified base URL once
+        slideImage.dataset.srcBase = slide.images[0];
+
+        const dist0 = Math.abs(getSignedDistance(absoluteIndex, 0));
+        // Priority hints BEFORE setting src
+        if (dist0 < 1.5) {
+          slideImage.loading = 'eager';
+          slideImage.decoding = 'async';
+          slideImage.fetchPriority = 'high';
+        } else {
+          slideImage.loading = 'lazy';
+          slideImage.decoding = 'async';
+          slideImage.fetchPriority = 'low';
+        }
+
+        // Choose size by distance from center
+        if (dist0 < 0.5) {
+          slideImage.src = largeVariant(slideImage.dataset.srcBase);
+        } else if (dist0 < 1.5) {
+          slideImage.src = smallVariant(slideImage.dataset.srcBase);
+        } else {
+          slideImage.src = tinyVariant(slideImage.dataset.srcBase);
+        }
+
+        // Pre-decode near-center to avoid first-motion jank
+        if (dist0 < 1.5) {
+          Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
+        }
+      }
     });
-
-    // --- image variant + priority, same as before ---
-    if (slideImage) {
-      slideImage.dataset.srcBase = slide.images[0];
-
-      const dist0 = Math.abs(getSignedDistance(absoluteIndex, 0));
-      if (dist0 < 1.5) {
-        slideImage.loading = 'eager';
-        slideImage.decoding = 'async';
-        slideImage.fetchPriority = 'high';
-      } else {
-        slideImage.loading = 'lazy';
-        slideImage.decoding = 'async';
-        slideImage.fetchPriority = 'low';
-      }
-
-      if (dist0 < 0.5) {
-        slideImage.src = largeVariant(slideImage.dataset.srcBase);
-      } else if (dist0 < 1.5) {
-        slideImage.src = smallVariant(slideImage.dataset.srcBase);
-      } else {
-        slideImage.src = tinyVariant(slideImage.dataset.srcBase);
-      }
-
-      if (dist0 < 1.5) {
-        Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
-      }
-    }
-  });
+  }
 
   currentOffset = 0;
   updatePositions();
@@ -426,34 +437,15 @@ function initCarousel() {
 }
 
 
-// Keep each node’s absoluteIndex close to currentOffset to avoid large distances
-function recycleIndexNearWindow(item) {
-  const n = slides.length;
-  // choose a target k such that (k % n) == (slide.id-1) and |k - currentOffset| is minimal
-  // (we already store absoluteIndex with that congruence; just shift by ±n as needed)
-  let d = getSignedDistance(item.absoluteIndex, currentOffset); // in slide units, wrapped
-  // d is already wrapped to [-n/2, n/2], but absoluteIndex itself may drift;
-  // when |d| exceeds our render window, move the element by ±n until it’s close.
-  const WINDOW = 4.5; // wider than your 3.5 visibility cutoff
-  while (d >  WINDOW) { item.absoluteIndex -= n; d -= n; }
-  while (d < -WINDOW) { item.absoluteIndex += n; d += n; }
-
-  // keep data-attribute in sync (optional, for debugging)
-  item.wrapper.dataset.absoluteIndex = String(item.absoluteIndex);
-}
-
 
 function updatePositions() {
   requestAnimationFrame(() => {
-    slideElements.forEach((el) => {
-      recycleIndexNearWindow(el); // <-- new line
-
-      const { wrapper, slideCard, slideImage, absoluteIndex } = el;
+    slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
       applyWrapperTransition(wrapper);
 
-      const dSigned   = getSignedDistance(absoluteIndex, currentOffset);
-      const ad        = Math.abs(dSigned);
-      const position  = getCardPosition(absoluteIndex, currentOffset);
+      const dSigned = getSignedDistance(absoluteIndex, currentOffset);
+      const ad = Math.abs(dSigned);
+      const position = getCardPosition(absoluteIndex, currentOffset);
       const isVisible = ad <= 3.5;
       const dimensions = getDimsFromDistance(ad);
       
@@ -468,10 +460,10 @@ function updatePositions() {
       wrapper.style.zIndex = String(1000 - Math.round(ad * 10));
 
       if (isMobile) {
-        wrapper.style.bottom = '';
-        wrapper.style.top = '50%';
-        wrapper.style.left = '50%';
-        wrapper.style.transform = `translate(-50%, calc(-50% + ${position}px))`;
+  wrapper.style.bottom = '';
+  wrapper.style.top = '50%';            // center reference point
+  wrapper.style.left = '50%';
+  wrapper.style.transform = `translate3d(-50%, calc(-50% + ${position}px), 0)`; 
       } else {
         wrapper.style.left = '50%';
         wrapper.style.bottom = '22%';
@@ -681,6 +673,14 @@ function handleUserInput(value) {
 }
 
 function switchToMultiline() {
+  // Pause auto-rotation and enter “zoomed” focus on desktop
+  setUserActive(true);
+  pauseRotation();
+  isFocusZoomed = !isMobile;
+
+  // Prevent the programmatic input swap from triggering collapse logic
+  suppressNextBlur = true;
+
   const els = {
     searchForm: q('searchForm'),
     formContent: q('formContent'),
@@ -692,10 +692,8 @@ function switchToMultiline() {
 
   els.searchForm?.classList.remove('single-line');
   els.searchForm?.classList.add('multi-line');
-
   els.formContent?.classList.remove('single-line');
   els.toolbar?.classList.remove('single-line');
-
   els.container?.classList.remove('single-line');
   els.container?.classList.add('multi-line');
 
@@ -703,12 +701,29 @@ function switchToMultiline() {
     els.textArea.value = els.textInput.value;
     els.textInput.classList.add('hidden');
     els.textArea.classList.remove('hidden');
-    els.textArea.focus();
+
+    // Focus the textarea and place caret at end (works across browsers)
+    requestAnimationFrame(() => {
+      els.textArea.focus({ preventScroll: true });
+      const end = els.textArea.value.length;
+      try { els.textArea.setSelectionRange(end, end); } catch {}
+      // Re-enable blur handling after the swap settles
+      setTimeout(() => { suppressNextBlur = false; }, 120);
+    });
+  } else {
+    // If we can't swap inputs, re-enable blur handling anyway
+    setTimeout(() => { suppressNextBlur = false; }, 0);
   }
+
   isSingleLineMode = false;
+  requestAnimationFrame(updatePositions);
 }
 
+
 function switchToSingleLine() {
+  // Exit zoom, allow rotation to resume after we leave multiline
+  isFocusZoomed = false;
+
   const els = {
     searchForm: q('searchForm'),
     formContent: q('formContent'),
@@ -720,10 +735,8 @@ function switchToSingleLine() {
 
   els.searchForm?.classList.remove('multi-line');
   els.searchForm?.classList.add('single-line');
-
   els.formContent?.classList.add('single-line');
   els.toolbar?.classList.add('single-line');
-
   els.container?.classList.remove('multi-line');
   els.container?.classList.add('single-line');
 
@@ -742,8 +755,16 @@ function switchToSingleLine() {
   if (storedPrompt && window.searchFeature) {
     window.searchFeature.setPrompt(truncateText(storedPrompt));
   }
+
   isSingleLineMode = true;
+
+  // We’re no longer “active”; setUserActive(false) allows startRotation() to re-arm
+  setUserActive(false);
+
+  // Ensure layout snaps back right away
+  requestAnimationFrame(updatePositions);
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // IMAGE INTEGRATION (DOM-only helpers for sync; no direct ownership)
@@ -863,59 +884,68 @@ function endDesktopDrag() {
 
 function setupEventHandlers() {
   // Wheel tuning (keep old logic; just smoother values)
-let wheelV = 0, wheelRAF = null, wheelAnimating = false;
-const WHEEL_ACCEL        = 0.0012; // how much deltaX/Y turns into velocity
-const WHEEL_FRICTION     = 0.92;   // glide: higher = longer coast
-const WHEEL_MIN_V        = 0.5015; // stop threshold
-const WHEEL_MAX_V        = 2.14;   // absolute velocity ceiling
-const PER_FRAME_VEL_CAP  = 0.20;   // max delta per frame (prevents bursts)
-const DEADZONE_PX        = 3;      // ignore micro scrolls/touchpad noise
-
+  let wheelV = 0, wheelRAF = null, wheelAnimating = false;
+  const WHEEL_ACCEL    = 0.0012;  // lower sensitivity
+  const WHEEL_FRICTION = 0.90;    // less glide
+  const WHEEL_MIN_V    = 0.0015;  // stop threshold
+  const WHEEL_MAX_V    = 0.18;    // lower top speed
+  const PER_FRAME_VEL_CAP = 0.12; // cap per-frame motion
+  const DEADZONE_PX = 2;          // ignore tiny scrolls
 
   const inputs = [q('textInput'), q('textArea')].filter(Boolean);
 
   inputs.forEach(input => {
 input.addEventListener('focus', () => {
   setUserActive(true);
-  isFocusZoomed = !isMobile;
-  updatePositions();
 
-
-  const wasSingleLine = q('searchForm')?.classList.contains('single-line');
-  if (wasSingleLine) {
-    switchToMultiline();
-    // ensure zoomed sizing applies after DOM class changes
-    requestAnimationFrame(updatePositions);
+  // Ensure we are in multiline first (safe if it runs when already multiline)
+  if (q('searchForm')?.classList.contains('single-line')) {
+    switchToMultiline(); // may swap focus to #textArea
   }
 
-      if (!userHasTakenControl) {
-        expandPrompt();
+  if (!userHasTakenControl) {
+    expandPrompt();
 
-        if (pendingInjectTimeout) {
-          clearTimeout(pendingInjectTimeout);
-          pendingInjectTimeout = null;
-        }
+    if (pendingInjectTimeout) {
+      clearTimeout(pendingInjectTimeout);
+      pendingInjectTimeout = null;
+    }
 
-        const slideIdAtFocus = getCurrentSlide()?.id;
-        const myToken = ++injectToken;
+    const slideIdAtFocus = getCurrentSlide()?.id;
+    const myToken = ++injectToken;
 
-        pendingInjectTimeout = setTimeout(() => {
-          if (myToken !== injectToken) return;
-          if (getCurrentSlide()?.id !== slideIdAtFocus) return;
+    // Let optional image injection happen first
+    pendingInjectTimeout = setTimeout(() => {
+      if (myToken !== injectToken) return;
+      if (getCurrentSlide()?.id !== slideIdAtFocus) return;
 
-          const multiline = q('searchForm')?.classList.contains('multi-line');
-          const userHasImgs = hasUserOwnedImages();
-          const anyThumbs   = getUIImageURLs().length > 0;
+      const multiline = q('searchForm')?.classList.contains('multi-line');
+      const userHasImgs = hasUserOwnedImages();
+      const anyThumbs   = getUIImageURLs().length > 0;
 
-          if (multiline && !userHasImgs && !anyThumbs) {
-            addCurrentSlideImage();
-            injectCurrentImageURL();
-          }
-        }, 80);
+      if (multiline && !userHasImgs && !anyThumbs) {
+        addCurrentSlideImage();
+        injectCurrentImageURL();
       }
-    });
+
+      // Enable zoom ONLY now (desktop + multiline)
+      isFocusZoomed = (!isMobile && !isSingleLineMode);
+
+      // Optional: snap to the nearest slide so center gets full zoom
+      // smoothSnapTo(Math.round(currentOffset));
+
+      // Apply after DOM changes settle
+      requestAnimationFrame(updatePositions);
+    }, 80);
+  } else {
+    // If user already typed, just enable zoom if we're in multiline
+    isFocusZoomed = (!isMobile && !isSingleLineMode);
+    updatePositions();
+  }
+});
 
 input.addEventListener('blur', (e) => {
+  if (suppressNextBlur) return; // ignore synthetic blur caused by input swap
   const container = q('searchContainer');
   const addBtn = q('addButton');
   const genBtn = q('generateButton');

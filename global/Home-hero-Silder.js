@@ -749,6 +749,10 @@ function switchToSingleLine() {
   if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
   window.searchFeature?.clearImages('all');
 
+  // ✅ RESET injection state when clearing
+  lastInjectedSlideId = null;
+  injectionInProgress = false;
+
   userHasTakenControl = false;
   isPromptExpanded = false;
 
@@ -757,11 +761,7 @@ function switchToSingleLine() {
   }
 
   isSingleLineMode = true;
-
-  // We’re no longer “active”; setUserActive(false) allows startRotation() to re-arm
   setUserActive(false);
-
-  // Ensure layout snaps back right away
   requestAnimationFrame(updatePositions);
 }
 
@@ -785,6 +785,12 @@ function clearImages(force = false, scope = 'all') {
 
   if (!sec.querySelector('.image-thumbnail')) sec.classList.add('hidden');
 
+  // ✅ RESET injection state when clearing carousel images
+  if (scope === 'carousel' || scope === 'all') {
+    lastInjectedSlideId = null;
+    injectionInProgress = false;
+  }
+
   if (!isSingleLineMode) scheduleSyncBackend();
 }
 
@@ -797,38 +803,50 @@ function shouldShowImage() {
   return searchForm && searchForm.classList.contains('multi-line');
 }
 
-function addCurrentSlideImage() {
+let injectionInProgress = false;
+let lastInjectedSlideId = null;
+
+async function addCurrentSlideImage() {
   const currentSlide = getCurrentSlide();
   const imageUrl = (currentSlide && currentSlide.injectUrl)
     ? String(currentSlide.injectUrl).trim()
     : '';
+  
   if (!imageUrl) return; // skip when empty
 
   const slideKey = currentSlide.label.toLowerCase().replace(/\s+/g, '-');
 
+  // PREVENT DUPLICATES: Check if already injected
   if (hasCarouselImage(imageUrl, slideKey)) {
     switchToMultiline();
-    if (!isSingleLineMode) scheduleSyncBackend();
-    // Keep Upload enabled after our injection
     const addBtn = q('addButton');
     if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
     return;
   }
 
-  if (!userHasTakenControl) window.searchFeature?.clearImages('carousel');
+  // PREVENT RACE CONDITIONS: Only one injection at a time
+  if (injectionInProgress) return;
+  if (lastInjectedSlideId === currentSlide.id) return;
 
-  window.searchFeature?.setExternalImage(imageUrl, slideKey);
-  switchToMultiline();
+  injectionInProgress = true;
+  lastInjectedSlideId = currentSlide.id;
 
-  // Enable Upload only for our injected images
-  const addBtn = q('addButton');
-  if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
+  try {
+    if (!userHasTakenControl) window.searchFeature?.clearImages('carousel');
+    
+    await window.searchFeature?.setExternalImage(imageUrl, slideKey);
+    switchToMultiline();
+
+    const addBtn = q('addButton');
+    if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
+    
+    if (!isSingleLineMode) scheduleSyncBackend();
+  } finally {
+    injectionInProgress = false;
+  }
 }
 
 
-function injectCurrentImageURL() {
-  if (!isSingleLineMode) scheduleSyncBackend();
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // DESKTOP DRAG-TO-SLIDE (mouse/pen only)
@@ -894,55 +912,50 @@ function setupEventHandlers() {
 
   const inputs = [q('textInput'), q('textArea')].filter(Boolean);
 
-  inputs.forEach(input => {
-input.addEventListener('focus', () => {
-  setUserActive(true);
+ inputs.forEach(input => {
+  input.addEventListener('focus', () => {
+    setUserActive(true);
 
-  // Ensure we are in multiline first (safe if it runs when already multiline)
-  if (q('searchForm')?.classList.contains('single-line')) {
-    switchToMultiline(); // may swap focus to #textArea
-  }
-
-  if (!userHasTakenControl) {
-    expandPrompt();
-
-    if (pendingInjectTimeout) {
-      clearTimeout(pendingInjectTimeout);
-      pendingInjectTimeout = null;
+    // Ensure we are in multiline first
+    if (q('searchForm')?.classList.contains('single-line')) {
+      switchToMultiline();
     }
 
-    const slideIdAtFocus = getCurrentSlide()?.id;
-    const myToken = ++injectToken;
+    if (!userHasTakenControl) {
+      expandPrompt();
 
-    // Let optional image injection happen first
-    pendingInjectTimeout = setTimeout(() => {
-      if (myToken !== injectToken) return;
-      if (getCurrentSlide()?.id !== slideIdAtFocus) return;
-
-      const multiline = q('searchForm')?.classList.contains('multi-line');
-      const userHasImgs = hasUserOwnedImages();
-      const anyThumbs   = getUIImageURLs().length > 0;
-
-      if (multiline && !userHasImgs && !anyThumbs) {
-        addCurrentSlideImage();
-        injectCurrentImageURL();
+      // Cancel any pending injection
+      if (pendingInjectTimeout) {
+        clearTimeout(pendingInjectTimeout);
+        pendingInjectTimeout = null;
       }
 
-      // Enable zoom ONLY now (desktop + multiline)
+      const slideIdAtFocus = getCurrentSlide()?.id;
+      const myToken = ++injectToken;
+
+      // SINGLE INJECTION POINT with proper checks
+      pendingInjectTimeout = setTimeout(() => {
+        if (myToken !== injectToken) return;
+        if (getCurrentSlide()?.id !== slideIdAtFocus) return;
+
+        const multiline = q('searchForm')?.classList.contains('multi-line');
+        const userHasImgs = hasUserOwnedImages();
+        const anyThumbs = getUIImageURLs().length > 0;
+
+        // Only inject if: multiline, no user images, no existing thumbnails
+        if (multiline && !userHasImgs && !anyThumbs) {
+          addCurrentSlideImage(); // ← SINGLE CALL, handles everything
+        }
+
+        // Enable zoom
+        isFocusZoomed = (!isMobile && !isSingleLineMode);
+        requestAnimationFrame(updatePositions);
+      }, 80);
+    } else {
       isFocusZoomed = (!isMobile && !isSingleLineMode);
-
-      // Optional: snap to the nearest slide so center gets full zoom
-      // smoothSnapTo(Math.round(currentOffset));
-
-      // Apply after DOM changes settle
-      requestAnimationFrame(updatePositions);
-    }, 80);
-  } else {
-    // If user already typed, just enable zoom if we're in multiline
-    isFocusZoomed = (!isMobile && !isSingleLineMode);
-    updatePositions();
-  }
-});
+      updatePositions();
+    }
+  });
 
 input.addEventListener('blur', (e) => {
   if (suppressNextBlur) return; // ignore synthetic blur caused by input swap
@@ -974,13 +987,13 @@ input.addEventListener('blur', (e) => {
 
 
 
-    input.addEventListener('input', (e) => {
-      handleUserInput(e.target.value);
-    });
+  input.addEventListener('input', (e) => {
+    handleUserInput(e.target.value);
+  });
 
-input.addEventListener('click', () => {
-  if (!userHasTakenControl) {
-    expandPrompt();
+ input.addEventListener('click', () => {
+    if (!userHasTakenControl) {
+      expandPrompt();
 
     // If the user already has images, do NOT inject ours
     if (hasUserOwnedImages()) return;

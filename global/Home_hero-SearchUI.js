@@ -84,62 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return new File([blob], `carousel-${safeKey}-${Date.now()}.${ext}`, { type: mime });
   };
 
-  // Preload image
-  const preloadImage = (url) => new Promise((resolve) => {
-    const i = new Image();
-    i.onload = () => resolve(true);
-    i.onerror = () => resolve(false);
-    i.src = url;
-  });
-
-  // Slot loader
-  const createSlotLoader = () => {
-    if (!imagesSection) return null;
-    imagesSection.classList.remove("hidden");
-    const slot = document.createElement("div");
-    slot.className = "image-thumbnail loading-slot";
-    Object.assign(slot.style, {
-      position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.04)", borderRadius: "8px", minWidth: "72px", minHeight: "72px", overflow: "hidden"
-    });
-
-    // Create animated gradient loader
-    const gradientBox = document.createElement("div");
-    Object.assign(gradientBox.style, {
-      width: "64px",
-      height: "64px",
-      borderRadius: "8px",
-      background: "linear-gradient(95.91deg, #6933FA 10.61%, #9C73FF 28.68%, #A1ADFC 44.38%, #4CCDFC 56.32%, #C3ADFF 77.5%, #6933FA 100.95%)",
-      backgroundSize: "200% 200%",
-      animation: "gradientMove 3s ease infinite"
-    });
-
-    // Add keyframe animation if not already added
-    if (!document.getElementById("gradient-loader-styles")) {
-      const style = document.createElement("style");
-      style.id = "gradient-loader-styles";
-      style.textContent = `
-        @keyframes gradientMove {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    slot.appendChild(gradientBox);
-    imagesSection.appendChild(slot);
-    state.loadingImage = true;
-    updateUI(false);
-    return slot;
-  };
-
-  const removeSlotLoader = (slot) => {
-    if (slot?.parentNode) slot.parentNode.removeChild(slot);
-    state.loadingImage = false;
-    updateUI(false);
-  };
+  // Removed loader and preload - direct URL injection is faster and cleaner
 
   // Image management
   const hasExternalImage = (url, slideKey) => state.images.some(x => x.url === url || (slideKey && x.slideKey === slideKey));
@@ -147,22 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const addExternalImage = async (url, slideKey, source = "carousel") => {
     if (!url || state.images.length >= MAX_IMAGES || hasExternalImage(url, slideKey)) return;
 
-    const slot = createSlotLoader();
-    const loaderStartTime = Date.now();
-    const MIN_LOADER_TIME = 200; // Minimum 200ms display time
-
-    await preloadImage(url);
-
-    // Calculate how long the loader has been showing
-    const elapsedTime = Date.now() - loaderStartTime;
-    const remainingTime = Math.max(0, MIN_LOADER_TIME - elapsedTime);
-
-    // Wait for remaining time to ensure loader shows for at least 200ms
-    if (remainingTime > 0) {
-      await new Promise(resolve => setTimeout(resolve, remainingTime));
-    }
-
-    if (slot) removeSlotLoader(slot);
+    // Direct injection - no loader
     state.images.push({ file: null, url, slideKey, source });
     updateState();
     updateAddButtonState();
@@ -207,7 +137,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const updateAddButtonState = () => {
     // Allow upload if: no images, OR only carousel image exists (user can replace it)
     const hasUserImage = state.images.some(x => x.source !== "carousel");
-    const blocked = (hasUserImage && state.images.length >= MAX_IMAGES) || state.loadingImage || state.isGenerating;
+    const blocked = (hasUserImage && state.images.length >= MAX_IMAGES) || state.isGenerating;
 
     if (addButton) {
       addButton.disabled = blocked;
@@ -225,8 +155,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const div = document.createElement("div");
       div.className = "image-thumbnail";
       Object.assign(div.style, {
-        backgroundImage: `url(${img.url})`, backgroundSize: "cover", backgroundPosition: "center",
-        borderRadius: "8px", minWidth: "72px", minHeight: "72px", position: "relative"
+        backgroundImage: `url(${img.url})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        borderRadius: "8px",
+        width: "72px",      // Fixed width to match loader
+        height: "72px",     // Fixed height to match loader
+        minWidth: "72px",
+        minHeight: "72px",
+        flexShrink: "0",    // Prevent shrinking
+        position: "relative"
       });
       if (img.source) div.dataset.source = img.source;
       if (img.slideKey) div.dataset.slideKey = img.slideKey;
@@ -241,8 +179,13 @@ document.addEventListener("DOMContentLoaded", () => {
         position: "absolute", top: "4px", right: "6px", background: "rgba(0,0,0,0.55)", color: "#fff",
         border: "0", borderRadius: "12px", width: "20px", height: "20px", lineHeight: "20px", cursor: "pointer"
       });
-      close.addEventListener("click", () => {
+      close.addEventListener("click", (e) => {
+        // Prevent event from bubbling
+        e.stopPropagation();
+
         const wasUserImage = state.images[idx]?.source === "user";
+        const wasCarouselImage = state.images[idx]?.source === "carousel";
+
         if (state.images[idx]?.file && state.images[idx]?.url?.startsWith("blob:")) {
           URL.revokeObjectURL(state.images[idx].url);
         }
@@ -251,6 +194,28 @@ document.addEventListener("DOMContentLoaded", () => {
         // If user removed their uploaded image and no images left, reset carousel
         if (wasUserImage && state.images.length === 0) {
           window.aiPhotoCarousel?.resetAfterImageRemoval?.();
+        }
+
+        // If carousel image was removed, reset everything to allow re-injection on next focus
+        if (wasCarouselImage) {
+          const storedPrompt = window.aiPhotoCarousel?.getStoredPrompt?.() || "";
+          if (storedPrompt && state.inputValue === storedPrompt) {
+            // Clear input value to reset state
+            state.inputValue = "";
+            if (textInput) textInput.value = "";
+            if (textArea) textArea.value = "";
+          }
+
+          // Clear the stored prompt in carousel
+          window.aiPhotoCarousel?.clearStoredPrompt?.();
+
+          // Reset carousel state to allow re-injection on next focus
+          window.aiPhotoCarousel?.resetAfterCarouselImageRemoval?.();
+
+          // Blur the input to collapse back to single-line
+          if (document.activeElement === textInput || document.activeElement === textArea) {
+            document.activeElement.blur();
+          }
         }
 
         updateState();
@@ -295,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (imagesSection) {
-      if (state.images.length > 0 || state.loadingImage) {
+      if (state.images.length > 0) {
         imagesSection.classList.remove("hidden");
         renderImages();
       } else {
@@ -308,7 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const promptPresent = state.inputValue.trim().length > 0;
     const overLimit = state.inputValue.length > state.maxChars;
-    const canGenerate = promptPresent && !overLimit && !state.loadingImage && !state.isGenerating;
+    const canGenerate = promptPresent && !overLimit && !state.isGenerating;
 
     generateButton?.classList.toggle("active", canGenerate);
     generateButton?.classList.toggle("inactive", !canGenerate);
@@ -329,7 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const prevMode = state.mode;
     const formIsMultiline = form?.classList.contains('multi-line');
 
-    if (state.images.length > 0 || state.loadingImage) state.mode = "image-attached";
+    if (state.images.length > 0) state.mode = "image-attached";
     else if (state.inputValue.length > 67) state.mode = "multiline";
     else if (state.inputValue.length > 0) state.mode = "filled";
     else if (state.active) state.mode = "active";
@@ -415,32 +380,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     for (const f of selected) {
       if (!isValidImageFile(f)) { flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); continue; }
-      const slot = createSlotLoader();
-      const loaderStartTime = Date.now();
-      const MIN_LOADER_TIME = 200; // Minimum 200ms display time
 
-      try {
-        const url = URL.createObjectURL(f);
-        await preloadImage(url);
+      const url = URL.createObjectURL(f);
+      state.images.push({ file: f, url, source: "user" });
 
-        // Calculate how long the loader has been showing
-        const elapsedTime = Date.now() - loaderStartTime;
-        const remainingTime = Math.max(0, MIN_LOADER_TIME - elapsedTime);
+      // Reset carousel landscape to normal (disable zoom, stop special positioning, keep paused)
+      window.aiPhotoCarousel?.resetCarouselLandscape?.();
 
-        // Wait for remaining time to ensure loader shows for at least 200ms
-        if (remainingTime > 0) {
-          await new Promise(resolve => setTimeout(resolve, remainingTime));
-        }
-
-        if (slot) removeSlotLoader(slot);
-        state.images.push({ file: f, url, source: "user" });
-
-        // Reset carousel landscape to normal (disable zoom, stop special positioning, keep paused)
-        window.aiPhotoCarousel?.resetCarouselLandscape?.();
-
-        updateState();
-        updateAddButtonState();
-      } finally {}
+      updateState();
+      updateAddButtonState();
     }
     if (ignored > 0) flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
     e.target.value = "";
@@ -457,7 +405,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!prompt) { flashError("Please enter a prompt."); return; }
     if (prompt.length > state.maxChars) { flashError(`Prompt too long. Max ${state.maxChars} characters.`); return; }
-    if (state.loadingImage) { flashError("Please wait for the image to finish loading."); return; }
 
     const files = state.images.map(x => x.file).filter(Boolean);
     const externalEntry = state.images.find(x => !x.file);

@@ -236,6 +236,15 @@ function initCarousel() {
   sliderTrack.innerHTML = '';
   slideElements = [];
 
+  // Preconnect to CDN for faster image loading
+  if (!document.querySelector('link[rel="preconnect"][href*="pixelbin.io"]')) {
+    const preconnect = document.createElement('link');
+    preconnect.rel = 'preconnect';
+    preconnect.href = 'https://cdn.pixelbin.io';
+    preconnect.crossOrigin = 'anonymous';
+    document.head.appendChild(preconnect);
+  }
+
   slides.forEach((slide, idx) => {
     const dist0 = Math.abs(getSignedDistance(idx, 0));
     const dims = getDimsFromDistance(dist0);
@@ -259,14 +268,32 @@ function initCarousel() {
 
     if (slideImage) {
       slideImage.dataset.srcBase = slide.images[0];
-      if (dist0 < 1.5) {
+
+      // Load all images at 600x400 for consistent quality without flicker
+      if (dist0 < 0.5) {
+        // Center image: highest priority, eager load
         slideImage.loading = 'eager';
         slideImage.fetchPriority = 'high';
+        slideImage.src = variant(slideImage.dataset.srcBase, 600, 400);
+        slideImage.decode().catch(() => {});
+      } else if (dist0 < 1.5) {
+        // Adjacent images: high priority, eager load
+        slideImage.loading = 'eager';
+        slideImage.fetchPriority = 'high';
+        slideImage.src = variant(slideImage.dataset.srcBase, 600, 400);
+        requestIdleCallback(() => slideImage.decode().catch(() => {}));
+      } else if (dist0 < 2.5) {
+        // Near images: lazy load
+        slideImage.loading = 'lazy';
+        slideImage.fetchPriority = 'low';
+        slideImage.src = variant(slideImage.dataset.srcBase, 600, 400);
+      } else {
+        // Far images: defer loading with placeholder until needed
+        slideImage.loading = 'lazy';
+        slideImage.fetchPriority = 'low';
+        slideImage.dataset.lazySrc = variant(slideImage.dataset.srcBase, 600, 400);
+        slideImage.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
       }
-      slideImage.src = dist0 < 0.5 ? variant(slideImage.dataset.srcBase, 900, 600)
-        : dist0 < 1.5 ? variant(slideImage.dataset.srcBase, 600, 400)
-        : variant(slideImage.dataset.srcBase, 450, 300);
-      if (dist0 < 1.5) Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
     }
   });
 
@@ -304,10 +331,9 @@ function updatePositions_now() {
     }
 
     if (slideCard) {
-      const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
       const shadowStyle = currentMode === 'user' ? (ad < 0.5 ? CENTER_SHADOW : LITE_SHADOW)
         : (dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW);
-      slideCard.style.borderRadius = rounded + 'px';
+      slideCard.style.borderRadius = '24px';
       slideCard.style.boxShadow = shadowStyle;
       slideCard.style.willChange = ad < 1.5 ? 'transform' : '';
       slideCard.style.transformOrigin = isMobile ? '50% 50%' : '50% 100%';
@@ -315,9 +341,15 @@ function updatePositions_now() {
     }
 
     if (slideImage) {
-      const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
-      slideImage.style.borderRadius = rounded + 'px';
+      slideImage.style.borderRadius = '24px';
       slideImage.style.objectPosition = (zoomActive() && ad < 0.5) ? '50% 45%' : '50% 50%';
+
+      // Dynamic lazy loading: load images when they come into view
+      if (ad < 2.5 && slideImage.dataset.lazySrc && slideImage.src.startsWith('data:')) {
+        slideImage.src = slideImage.dataset.lazySrc;
+        delete slideImage.dataset.lazySrc;
+        slideImage.loading = 'lazy';
+      }
     }
   });
 
@@ -896,6 +928,13 @@ window.aiPhotoCarousel = {
     isFocusZoomed = false;
     requestUpdate();
     // Don't call scheduleSyncBackend() - it would convert the user's File to an external URL
+  },
+  resetCarouselLandscape() {
+    // Reset carousel to normal landscape without resuming rotation (user is in control)
+    isFocusZoomed = false;
+    userHasTakenControl = true;
+    pauseRotation();
+    requestUpdate();
   },
   resetAfterImageRemoval() {
     // Reset carousel state when user removes all images

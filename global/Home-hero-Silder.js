@@ -611,7 +611,12 @@ function pauseRotation() {
 function setUserActive(active) {
   isUserActive = active;
   if (active) pauseRotation();
-  else setTimeout(() => { if (!isUserActive && !isDragging) startRotation(); }, 500);
+  else setTimeout(() => { 
+    // ✅ Only restart if user hasn't taken control AND no user images present
+    if (!isUserActive && !isDragging && !userHasTakenControl && !hasUserOwnedImages()) {
+      startRotation();
+    }
+  }, 500);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

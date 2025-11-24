@@ -195,16 +195,16 @@ function getDimsFromDistance(ad) {
   if (ad < 0.5) {
     if (zoomActive()) return { width: 748, height: 437, opacity: 1, yOffset: 0, shadow: true };
     return isMobile
-      ? { width: 360, height: 451, opacity: 1, yOffset: 0, shadow: true }
+      ? { width: 300, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Reduced from 360x451 to fit 320px screens
       : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };
   } else if (ad < 1.5) {
     return isMobile
-      ? { width: 240, height: 300, opacity: 0.7, yOffset: 0, shadow: false }
-      : { width: 272, height: 340, opacity: 0.7, yOffset: 0, shadow: false };
+      ? { width: 240, height: 300, opacity: 0.4, yOffset: 0, shadow: false }  // Reduced opacity from 0.7 to 0.4 for better text visibility
+      : { width: 272, height: 340, opacity: 0.4, yOffset: 0, shadow: false };  // Reduced opacity from 0.7 to 0.4 for better text visibility
   }
   return isMobile
-    ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
-    : { width: 208, height: 260, opacity: 0.2, yOffset: 0, shadow: false };
+    ? { width: 240, height: 300, opacity: 0.15, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
+    : { width: 208, height: 260, opacity: 0.15, yOffset: 0, shadow: false };  // Reduced opacity from 0.2 to 0.15 for better text visibility
 }
 
 // ===== DOM BUILD =====
@@ -546,10 +546,11 @@ function switchToMultiline() {
   if (els.container) els.container.offsetHeight;
   if (els.searchForm) els.searchForm.offsetHeight;
 
-  const transition = '400ms cubic-bezier(0.4, 0, 0.2, 1)';
-  if (els.searchForm) els.searchForm.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity 400ms ease`;
-  if (els.container) els.container.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity 400ms ease`;
-  if (els.formContent) els.formContent.style.transition = 'opacity 400ms ease';
+  const transition = isMobile ? '200ms cubic-bezier(0.4, 0, 0.2, 1)' : '400ms cubic-bezier(0.4, 0, 0.2, 1)';
+  const opacityDuration = isMobile ? '200ms' : '400ms';
+  if (els.searchForm) els.searchForm.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity ${opacityDuration} ease`;
+  if (els.container) els.container.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity ${opacityDuration} ease`;
+  if (els.formContent) els.formContent.style.transition = `opacity ${opacityDuration} ease`;
 
   requestAnimationFrame(() => {
     els.searchForm?.classList.remove('single-line');
@@ -588,7 +589,7 @@ function switchToMultiline() {
       if (el) { el.style.transition = ''; el.style.height = ''; el.style.minHeight = ''; }
     });
     suppressNextBlur = false;
-  }, 450);
+  }, isMobile ? 250 : 450);
 
   isSingleLineMode = false;
   requestUpdate();
@@ -618,10 +619,11 @@ function switchToSingleLine() {
   if (els.container) els.container.offsetHeight;
   if (els.searchForm) els.searchForm.offsetHeight;
 
-  const transition = '400ms cubic-bezier(0.4, 0, 0.2, 1)';
-  if (els.searchForm) els.searchForm.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity 400ms ease`;
-  if (els.container) els.container.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity 400ms ease`;
-  if (els.formContent) els.formContent.style.transition = 'opacity 400ms ease';
+  const transition = isMobile ? '200ms cubic-bezier(0.4, 0, 0.2, 1)' : '400ms cubic-bezier(0.4, 0, 0.2, 1)';
+  const opacityDuration = isMobile ? '200ms' : '400ms';
+  if (els.searchForm) els.searchForm.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity ${opacityDuration} ease`;
+  if (els.container) els.container.style.transition = `height ${transition}, min-height ${transition}, border-radius ${transition}, opacity ${opacityDuration} ease`;
+  if (els.formContent) els.formContent.style.transition = `opacity ${opacityDuration} ease`;
 
   requestAnimationFrame(() => {
     els.searchForm?.classList.remove('multi-line');
@@ -649,7 +651,7 @@ function switchToSingleLine() {
     [els.container, els.searchForm, els.formContent].forEach(el => {
       if (el) { el.style.transition = ''; el.style.height = ''; el.style.minHeight = ''; }
     });
-  }, 450);
+  }, isMobile ? 250 : 450);
 
   if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
   window.searchFeature?.clearImages('all');

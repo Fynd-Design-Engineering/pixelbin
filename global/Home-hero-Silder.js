@@ -715,9 +715,10 @@ function handleUserInput(value) {
 }
 
 function switchToMultiline() {
-  // 🔖 VERSION: v1.2-delayed-prompt (CURRENT)
-  // Prompt expands immediately with animation (no blank space)
-  // Previous: v1.1-nested-raf-consistent (had timing issues with prompt)
+  // 🔖 VERSION: v1.3-improved-wheel-scroll (CURRENT)
+  // + Better wheel scroll with auto-centering & smooth friction
+  // + Prompt timing fixed (no blank space)
+  // Previous: v1.2-delayed-prompt
 
   // Pause auto-rotation and enter "zoomed" focus on desktop
   setUserActive(true);
@@ -837,9 +838,10 @@ function switchToMultiline() {
 
 
 function switchToSingleLine() {
-  // 🔖 VERSION: v1.2-delayed-prompt (CURRENT)
-  // Prompt truncates AFTER animation completes (no blank space)
-  // Previous: v1.1-nested-raf-consistent (had timing issues with prompt)
+  // 🔖 VERSION: v1.3-improved-wheel-scroll (CURRENT)
+  // + Better wheel scroll with auto-centering & smooth friction
+  // + Prompt timing fixed (no blank space)
+  // Previous: v1.2-delayed-prompt
 
   // Exit zoom, allow rotation to resume after we leave multiline
   isFocusZoomed = false;
@@ -1090,14 +1092,16 @@ function endDesktopDrag() {
 ////////////////////////////////////////////////////////////////////////////////
 
 function setupEventHandlers() {
-  // Wheel tuning (keep old logic; just smoother values)
+  // 🔧 IMPROVED: Better wheel scroll with proper centering
   let wheelV = 0, wheelRAF = null, wheelAnimating = false;
-  const WHEEL_ACCEL    = 0.002;  // lower sensitivity
-  const WHEEL_FRICTION = 0.63;    // less glide
-  const WHEEL_MIN_V    = 0.109;  // stop threshold
-  const WHEEL_MAX_V    = 0.9;    // lower top speed
-  const PER_FRAME_VEL_CAP = 0.35; // cap per-frame motion
-  const DEADZONE_PX = 2;          // ignore tiny scrolls
+  let wheelAccumulated = 0; // Track accumulated scroll
+  let lastWheelTime = 0;
+
+  const WHEEL_SENSITIVITY = 0.008;  // How much each pixel of scroll moves the slider
+  const WHEEL_FRICTION = 0.88;      // Higher = more glide, smoother feel
+  const WHEEL_MIN_V = 0.005;        // Lower threshold for stopping
+  const WHEEL_TIMEOUT = 150;        // ms of no scroll before auto-snap
+  const SNAP_THRESHOLD = 0.15;      // Snap to nearest if within this distance
 
   const inputs = [q('textInput'), q('textArea')].filter(Boolean);
 
@@ -1288,9 +1292,11 @@ inputs.forEach(input => {
     window.searchFeature?.clearImages('all');
   });
 
-  // Wheel: only horizontal moves slider (old logic, retuned)
+  // 🔧 IMPROVED: Wheel scroll with auto-centering
   const wheelSurface = q('slider-track');
   if (wheelSurface) {
+    let wheelTimeout = null;
+
     wheelSurface.addEventListener('wheel', (e) => {
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
@@ -1303,6 +1309,13 @@ inputs.forEach(input => {
 
       e.preventDefault();
       setUserActive(true);
+      lastWheelTime = performance.now();
+
+      // Cancel any pending snap
+      if (wheelTimeout) {
+        clearTimeout(wheelTimeout);
+        wheelTimeout = null;
+      }
 
       if (isSnapping && snapRaf) {
         cancelAnimationFrame(snapRaf);
@@ -1315,39 +1328,55 @@ inputs.forEach(input => {
       const dx = useShiftAsHorizontal ? e.deltaY : e.deltaX;
       if (!dx) return;
 
-      // tiny deadzone
-      if (Math.abs(dx) < DEADZONE_PX) return;
-
-      // accumulate velocity
-      wheelV -= -dx * WHEEL_ACCEL;
-      // clamp running velocity
-      if (wheelV >  WHEEL_MAX_V) wheelV =  WHEEL_MAX_V;
-      if (wheelV < -WHEEL_MAX_V) wheelV = -WHEEL_MAX_V;
+      // Apply scroll directly with sensitivity
+      wheelAccumulated += dx;
+      wheelV = dx * WHEEL_SENSITIVITY;
 
       if (!wheelAnimating) {
         wheelAnimating = true;
         const step = () => {
-          // cap per-frame motion to avoid jumps
-          if (wheelV >  PER_FRAME_VEL_CAP) wheelV =  PER_FRAME_VEL_CAP;
-          if (wheelV < -PER_FRAME_VEL_CAP) wheelV = -PER_FRAME_VEL_CAP;
-
           currentOffset += wheelV;
           requestUpdate();
 
-          // friction
+          // Apply friction
           wheelV *= WHEEL_FRICTION;
 
+          // Check if velocity is very low
           if (Math.abs(wheelV) < WHEEL_MIN_V) {
             wheelAnimating = false;
-            const target = Math.round(currentOffset);
-            smoothSnapTo(target);
-            setTimeout(() => setUserActive(false), 300);
-            return;
+
+            // Smart snap: find nearest slide
+            const nearest = Math.round(currentOffset);
+            const distance = Math.abs(currentOffset - nearest);
+
+            // If close enough, snap to nearest
+            if (distance < SNAP_THRESHOLD || performance.now() - lastWheelTime > WHEEL_TIMEOUT) {
+              smoothSnapTo(nearest);
+              setTimeout(() => setUserActive(false), 300);
+              wheelAccumulated = 0;
+              return;
+            }
           }
+
           wheelRAF = requestAnimationFrame(step);
         };
         wheelRAF = requestAnimationFrame(step);
       }
+
+      // Set timeout to auto-snap after user stops scrolling
+      wheelTimeout = setTimeout(() => {
+        if (wheelAnimating) {
+          wheelAnimating = false;
+          if (wheelRAF) {
+            cancelAnimationFrame(wheelRAF);
+            wheelRAF = null;
+          }
+          const nearest = Math.round(currentOffset);
+          smoothSnapTo(nearest);
+          setTimeout(() => setUserActive(false), 300);
+          wheelAccumulated = 0;
+        }
+      }, WHEEL_TIMEOUT);
     }, { passive: false });
 
     

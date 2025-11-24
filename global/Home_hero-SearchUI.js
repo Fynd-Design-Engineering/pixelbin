@@ -162,19 +162,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return state.images.some(x => x.url === url || (slideKey && x.slideKey === slideKey));
   }
 
-  async function addExternalImage(url, slideKey, source = "carousel") {
-    if (!url) return;
-    if (state.images.length >= MAX_IMAGES) return;
-    if (hasExternalImage(url, slideKey)) return;
+// In UI script - addExternalImage (carousel injection)
+async function addExternalImage(url, slideKey, source = "carousel") {
+  if (!url) return;
+  
+  // ✅ Allow carousel image even if user images exist
+  // Only prevent duplicate carousel images
+  if (hasExternalImage(url, slideKey)) return;
 
-    const slot = createSlotLoader();
-    await preloadImage(url);
-    if (slot) removeSlotLoader(slot);
+  const slot = createSlotLoader();
+  await preloadImage(url);
+  if (slot) removeSlotLoader(slot);
 
-    state.images.push({ file: null, url, slideKey, source });
-    updateState();
-    updateAddButtonState();
-  }
+  state.images.push({ file: null, url, slideKey, source });
+  updateState();
+  updateAddButtonState();
+}
 
   function clearImagesByScope(scope = "all") {
     if (scope === "carousel") {
@@ -215,15 +218,21 @@ document.addEventListener("DOMContentLoaded", () => {
     form?.classList.toggle("over-limit", len > state.maxChars);
   };
 
-  function updateAddButtonState() {
-    const blocked = state.images.length >= MAX_IMAGES || state.loadingImage || state.isGenerating;
-    if (addButton) {
-      addButton.disabled = blocked;
-      addButton.classList.toggle("is-disabled", blocked);
-      addButton.setAttribute("aria-disabled", String(blocked));
-    }
-    if (state.images.length >= MAX_IMAGES) hideImageHint();
+// In UI script - updateAddButtonState()
+function updateAddButtonState() {
+  // Only count USER images, not carousel images
+  const userImageCount = state.images.filter(x => x.source === 'user').length;
+  const blocked = userImageCount >= MAX_IMAGES || state.loadingImage || state.isGenerating;
+  
+  if (addButton) {
+    addButton.disabled = blocked;
+    addButton.classList.toggle("is-disabled", blocked);
+    addButton.setAttribute("aria-disabled", String(blocked));
   }
+  
+  // Only hide hint when USER images reach max
+  if (userImageCount >= MAX_IMAGES) hideImageHint();
+}
 
   // Render thumbnails
   const renderImages = () => {
@@ -375,42 +384,51 @@ function switchLayoutWithoutAnimation(multi) {
     });
   });
 
-  addButton?.addEventListener("click", () => {
-    if (state.images.length >= MAX_IMAGES) { flashError(`Maximum ${MAX_IMAGES} images allowed.`); return; }
-    fileInput?.click();
-  });
+addButton?.addEventListener("click", () => {
+  const userImageCount = state.images.filter(x => x.source === 'user').length;
+  if (userImageCount >= MAX_IMAGES) { 
+    flashError(`Maximum ${MAX_IMAGES} images allowed.`); 
+    return; 
+  }
+  fileInput?.click();
+});
   addButton?.addEventListener("mouseenter", () => { addButton.classList.add("active"); if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show"); });
   addButton?.addEventListener("mouseleave", () => { addButton.classList.remove("active"); tooltip?.classList.remove("show"); });
 
   // File upload → show loader in the thumbnail slot only
-  fileInput?.addEventListener("change", async (e) => {
+  // In UI script - file upload handler
+fileInput?.addEventListener("change", async (e) => {
   const incoming = Array.from(e.target.files || []);
   if (!incoming.length) return;
 
-  const remaining = Math.max(0, MAX_IMAGES - state.images.length);
+  // Calculate remaining slots for USER images only
+  const userImageCount = state.images.filter(x => x.source === 'user').length;
+  const remaining = Math.max(0, MAX_IMAGES - userImageCount);
   const selected = incoming.slice(0, remaining);
-  const ignored = incoming.length - selected.length;
 
-for (const f of selected) {
-  if (!isValidImageFile(f)) { 
-    flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); 
-    continue; 
+  for (const f of selected) {
+    if (!isValidImageFile(f)) { 
+      flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); 
+      continue; 
+    }
+    
+    // ✅ Auto-remove carousel images when user uploads
+    state.images = state.images.filter(x => x.source !== 'carousel');
+    
+    const slot = createSlotLoader();
+    try {
+      const url = URL.createObjectURL(f);
+      await preloadImage(url);
+      if (slot) removeSlotLoader(slot);
+      
+      state.images.push({ file: f, url, source: "user" });
+      window.aiPhotoCarousel?.markUserUpload?.(url);
+      
+      updateState();
+      updateAddButtonState();
+    } finally {}
   }
-  const slot = createSlotLoader();
-  try {
-    const url = URL.createObjectURL(f);
-    await preloadImage(url);
-    if (slot) removeSlotLoader(slot);
-    state.images.push({ file: f, url, source: "user" }); // ✅ Mark as user
-    
-    // ✅ Pause carousel permanently until image removed
-    window.aiPhotoCarousel?.markUserUpload?.(url);
-    
-    updateState();
-    updateAddButtonState();
-  } finally {}
-}
-  if (ignored > 0) flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
+  
   e.target.value = "";
 });
 

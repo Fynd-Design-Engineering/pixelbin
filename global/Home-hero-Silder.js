@@ -812,19 +812,14 @@ async function addCurrentSlideImage() {
     ? String(currentSlide.injectUrl).trim()
     : '';
   
-  if (!imageUrl) return; // skip when empty
-
+  if (!imageUrl) return;
   const slideKey = currentSlide.label.toLowerCase().replace(/\s+/g, '-');
 
-  // PREVENT DUPLICATES: Check if already injected
   if (hasCarouselImage(imageUrl, slideKey)) {
-    switchToMultiline();
-    const addBtn = q('addButton');
-    if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
+    switchToMultiline(); // Already injected, just switch mode
     return;
   }
 
-  // PREVENT RACE CONDITIONS: Only one injection at a time
   if (injectionInProgress) return;
   if (lastInjectedSlideId === currentSlide.id) return;
 
@@ -834,11 +829,17 @@ async function addCurrentSlideImage() {
   try {
     if (!userHasTakenControl) window.searchFeature?.clearImages('carousel');
     
+    // ✅ CORRECT: Let the UI script handle loading state
     await window.searchFeature?.setExternalImage(imageUrl, slideKey);
+    
+    // ✅ Switch to multiline AFTER injection completes
     switchToMultiline();
 
     const addBtn = q('addButton');
-    if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
+    if (addBtn) { 
+      addBtn.disabled = false; 
+      addBtn.ariaDisabled = 'false'; 
+    }
     
     if (!isSingleLineMode) scheduleSyncBackend();
   } finally {

@@ -891,11 +891,21 @@ window.aiPhotoCarousel = {
   },
   markUserUpload(url) {
     userHasTakenControl = true;
-    window.searchFeature?.clearImages('carousel');
+    // Don't clear images or sync - homepage.js already handled the user upload
     pauseRotation();
     isFocusZoomed = false;
     requestUpdate();
-    if (!isSingleLineMode) scheduleSyncBackend();
+    // Don't call scheduleSyncBackend() - it would convert the user's File to an external URL
+  },
+  resetAfterImageRemoval() {
+    // Reset carousel state when user removes all images
+    userHasTakenControl = false;
+    isFocusZoomed = false;
+    requestUpdate();
+    // Resume auto-rotation if not in single-line mode and no user-owned images
+    if (!isSingleLineMode && !hasUserOwnedImages()) {
+      startRotation();
+    }
   },
   getStoredPrompt: () => storedPrompt
 };

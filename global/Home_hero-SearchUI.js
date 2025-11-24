@@ -170,13 +170,16 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const updateAddButtonState = () => {
-    const blocked = state.images.length >= MAX_IMAGES || state.loadingImage || state.isGenerating;
+    // Allow upload if: no images, OR only carousel image exists (user can replace it)
+    const hasUserImage = state.images.some(x => x.source !== "carousel");
+    const blocked = (hasUserImage && state.images.length >= MAX_IMAGES) || state.loadingImage || state.isGenerating;
+
     if (addButton) {
       addButton.disabled = blocked;
       addButton.classList.toggle("is-disabled", blocked);
       addButton.setAttribute("aria-disabled", String(blocked));
     }
-    if (state.images.length >= MAX_IMAGES) hideImageHint();
+    if (hasUserImage && state.images.length >= MAX_IMAGES) hideImageHint();
   };
 
   // Render thumbnails
@@ -204,10 +207,17 @@ document.addEventListener("DOMContentLoaded", () => {
         border: "0", borderRadius: "12px", width: "20px", height: "20px", lineHeight: "20px", cursor: "pointer"
       });
       close.addEventListener("click", () => {
+        const wasUserImage = state.images[idx]?.source === "user";
         if (state.images[idx]?.file && state.images[idx]?.url?.startsWith("blob:")) {
           URL.revokeObjectURL(state.images[idx].url);
         }
         state.images.splice(idx, 1);
+
+        // If user removed their uploaded image and no images left, reset carousel
+        if (wasUserImage && state.images.length === 0) {
+          window.aiPhotoCarousel?.resetAfterImageRemoval?.();
+        }
+
         updateState();
         updateAddButtonState();
       });
@@ -331,7 +341,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Add button
   addButton?.addEventListener("click", () => {
-    if (state.images.length >= MAX_IMAGES) { flashError(`Maximum ${MAX_IMAGES} images allowed.`); return; }
+    // Check if we have user images at max limit (carousel images can be replaced)
+    const hasUserImage = state.images.some(x => x.source !== "carousel");
+    if (hasUserImage && state.images.length >= MAX_IMAGES) {
+      flashError(`Maximum ${MAX_IMAGES} images allowed.`);
+      return;
+    }
     fileInput?.click();
   });
   addButton?.addEventListener("mouseenter", () => { addButton.classList.add("active"); if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show"); });
@@ -341,6 +356,12 @@ document.addEventListener("DOMContentLoaded", () => {
   fileInput?.addEventListener("change", async (e) => {
     const incoming = Array.from(e.target.files || []);
     if (!incoming.length) return;
+
+    // If carousel image exists, remove it to make room for user upload
+    const carouselIndex = state.images.findIndex(x => x.source === "carousel");
+    if (carouselIndex !== -1) {
+      state.images.splice(carouselIndex, 1);
+    }
 
     const remaining = Math.max(0, MAX_IMAGES - state.images.length);
     const selected = incoming.slice(0, remaining);
@@ -353,7 +374,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const url = URL.createObjectURL(f);
         await preloadImage(url);
         if (slot) removeSlotLoader(slot);
-        state.images.push({ file: f, url });
+        state.images.push({ file: f, url, source: "user" });
+
+        // Notify carousel that user uploaded an image (disable zoom, pause rotation)
+        window.aiPhotoCarousel?.markUserUpload?.(url);
+
         updateState();
         updateAddButtonState();
       } finally {}
@@ -379,6 +404,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const externalEntry = state.images.find(x => !x.file);
     const externalImageUrl = externalEntry?.url;
     const externalSlideKey = externalEntry?.slideKey || "carousel";
+
+    console.log('[Generate] Debug:', {
+      needs,
+      filesCount: files.length,
+      externalImageUrl,
+      totalImages: state.images.length,
+      images: state.images.map(x => ({ hasFile: !!x.file, source: x.source, url: x.url?.substring(0, 50) })),
+      firstFile: files[0]
+    });
 
     if (needs && files.length === 0 && !externalImageUrl) {
       showImageHint();

@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
   const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
   const HINT_ON_SUBMIT_ONLY = true;
-  const LOADER_URL = "https://cdn.prod.website-files.com/673193e0642e6ad25696fcd4/6921902dc9c1daf39440e804_image%20(8).png";
 
   const ACTION_FIRST_WORDS = ["remove","erase","delete","replace","edit","upscale"];
   const keywordNeedsImage = (text) => {
@@ -103,11 +102,33 @@ document.addEventListener("DOMContentLoaded", () => {
       position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center",
       background: "rgba(0,0,0,0.04)", borderRadius: "8px", minWidth: "72px", minHeight: "72px", overflow: "hidden"
     });
-    const spin = document.createElement("img");
-    spin.src = LOADER_URL;
-    spin.alt = "Loading…";
-    Object.assign(spin.style, { width: "48px", height: "48px", objectFit: "contain", opacity: "0.85" });
-    slot.appendChild(spin);
+
+    // Create animated gradient loader
+    const gradientBox = document.createElement("div");
+    Object.assign(gradientBox.style, {
+      width: "64px",
+      height: "64px",
+      borderRadius: "8px",
+      background: "linear-gradient(95.91deg, #6933FA 10.61%, #9C73FF 28.68%, #A1ADFC 44.38%, #4CCDFC 56.32%, #C3ADFF 77.5%, #6933FA 100.95%)",
+      backgroundSize: "200% 200%",
+      animation: "gradientMove 3s ease infinite"
+    });
+
+    // Add keyframe animation if not already added
+    if (!document.getElementById("gradient-loader-styles")) {
+      const style = document.createElement("style");
+      style.id = "gradient-loader-styles";
+      style.textContent = `
+        @keyframes gradientMove {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    slot.appendChild(gradientBox);
     imagesSection.appendChild(slot);
     state.loadingImage = true;
     updateUI(false);
@@ -125,8 +146,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const addExternalImage = async (url, slideKey, source = "carousel") => {
     if (!url || state.images.length >= MAX_IMAGES || hasExternalImage(url, slideKey)) return;
+
     const slot = createSlotLoader();
+    const loaderStartTime = Date.now();
+    const MIN_LOADER_TIME = 200; // Minimum 200ms display time
+
     await preloadImage(url);
+
+    // Calculate how long the loader has been showing
+    const elapsedTime = Date.now() - loaderStartTime;
+    const remainingTime = Math.max(0, MIN_LOADER_TIME - elapsedTime);
+
+    // Wait for remaining time to ensure loader shows for at least 200ms
+    if (remainingTime > 0) {
+      await new Promise(resolve => setTimeout(resolve, remainingTime));
+    }
+
     if (slot) removeSlotLoader(slot);
     state.images.push({ file: null, url, slideKey, source });
     updateState();
@@ -294,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const prevMode = state.mode;
     const formIsMultiline = form?.classList.contains('multi-line');
 
-    if (state.images.length > 0) state.mode = "image-attached";
+    if (state.images.length > 0 || state.loadingImage) state.mode = "image-attached";
     else if (state.inputValue.length > 67) state.mode = "multiline";
     else if (state.inputValue.length > 0) state.mode = "filled";
     else if (state.active) state.mode = "active";
@@ -363,6 +398,17 @@ document.addEventListener("DOMContentLoaded", () => {
       state.images.splice(carouselIndex, 1);
     }
 
+    // Expand truncated prompt to full when user uploads (multiline mode will show full prompt)
+    const storedPrompt = window.aiPhotoCarousel?.getStoredPrompt?.() || "";
+    if (storedPrompt && storedPrompt.length > 67) {
+      const currentValue = state.inputValue;
+      const truncated = truncateForUI(storedPrompt, 64);
+      // If current value is truncated, expand to full
+      if (currentValue === truncated || (currentValue.endsWith("...") && storedPrompt.startsWith(currentValue.replace(/\.\.\.$/, "").trim()))) {
+        state.inputValue = storedPrompt;
+      }
+    }
+
     const remaining = Math.max(0, MAX_IMAGES - state.images.length);
     const selected = incoming.slice(0, remaining);
     const ignored = incoming.length - selected.length;
@@ -370,14 +416,27 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const f of selected) {
       if (!isValidImageFile(f)) { flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); continue; }
       const slot = createSlotLoader();
+      const loaderStartTime = Date.now();
+      const MIN_LOADER_TIME = 200; // Minimum 200ms display time
+
       try {
         const url = URL.createObjectURL(f);
         await preloadImage(url);
+
+        // Calculate how long the loader has been showing
+        const elapsedTime = Date.now() - loaderStartTime;
+        const remainingTime = Math.max(0, MIN_LOADER_TIME - elapsedTime);
+
+        // Wait for remaining time to ensure loader shows for at least 200ms
+        if (remainingTime > 0) {
+          await new Promise(resolve => setTimeout(resolve, remainingTime));
+        }
+
         if (slot) removeSlotLoader(slot);
         state.images.push({ file: f, url, source: "user" });
 
-        // Notify carousel that user uploaded an image (disable zoom, pause rotation)
-        window.aiPhotoCarousel?.markUserUpload?.(url);
+        // Reset carousel landscape to normal (disable zoom, stop special positioning, keep paused)
+        window.aiPhotoCarousel?.resetCarouselLandscape?.();
 
         updateState();
         updateAddButtonState();

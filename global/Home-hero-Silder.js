@@ -909,7 +909,7 @@ function setupEventHandlers() {
   // Wheel tuning (keep old logic; just smoother values)
   let wheelV = 1, wheelRAF = null, wheelAnimating = false;
   const WHEEL_ACCEL    = 0.002;  // lower sensitivity
-  const WHEEL_FRICTION = 0.93;    // less glide
+  const WHEEL_FRICTION = 0.63;    // less glide
   const WHEEL_MIN_V    = 0.109;  // stop threshold
   const WHEEL_MAX_V    = 0.9;    // lower top speed
   const PER_FRAME_VEL_CAP = 0.35; // cap per-frame motion

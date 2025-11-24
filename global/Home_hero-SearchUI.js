@@ -268,21 +268,26 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // Layout switching without animation jank
-  function switchLayoutWithoutAnimation(multi) {
-    const els = [form, formContent, toolbar];
-    const prevTransitions = els.map((el) => (el ? el.style.transition : ""));
-    els.forEach((el) => { if (el) el.style.transition = "none"; });
+  // Around line 280 in UI script
+function switchLayoutWithoutAnimation(multi) {
+  const els = [form, formContent, toolbar].filter(Boolean); // ✅ Filter out nulls
+  const prevTransitions = els.map((el) => el.style.transition);
+  els.forEach((el) => { el.style.transition = "none"; });
 
-    form?.classList.toggle("multi-line", multi);
-    form?.classList.toggle("single-line", !multi);
-    container?.classList.toggle("multi-line", multi);
-    container?.classList.toggle("single-line", !multi);
-    formContent?.classList.toggle("single-line", !multi);
-    toolbar?.classList.toggle("single-line", !multi);
+  form?.classList.toggle("multi-line", multi);
+  form?.classList.toggle("single-line", !multi);
+  container?.classList.toggle("multi-line", multi);
+  container?.classList.toggle("single-line", !multi);
+  formContent?.classList.toggle("single-line", !multi);
+  toolbar?.classList.toggle("single-line", !multi);
 
-    form?.offsetHeight;
-    requestAnimationFrame(() => { els.forEach((el, i) => { if (el) el.style.transition = prevTransitions[i] || ""; }); });
-  }
+  // Force reflow - but check element exists
+  if (form) form.offsetHeight; // ✅ Only if form exists
+  
+  requestAnimationFrame(() => { 
+    els.forEach((el, i) => { el.style.transition = prevTransitions[i]; }); 
+  });
+}
 
   // UI update
   const updateUI = (flipLayout = false) => {

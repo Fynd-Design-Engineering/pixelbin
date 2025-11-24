@@ -79,6 +79,8 @@ let suppressNextBlur = false;
 let injectionInProgress = false;
 let lastInjectedSlideId = null;
 
+const LITE_SHADOW = '0 1px 2px rgba(0,0,0,0.08)';
+
 // Focus-zoom state & tuning (applies on DESKTOP only)
 let isFocusZoomed = false;
 const FOCUS_SCALE = 1;          // 1.3x scale on center card
@@ -472,8 +474,6 @@ scheduleSyncBackend();
 }
 
 
-
-
 function updatePositions_now() {
   slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
    
@@ -487,6 +487,8 @@ function updatePositions_now() {
     wrapper.style.width = dimensions.width + 'px';
     wrapper.style.height = dimensions.height + 'px';
     wrapper.style.opacity = String(dimensions.opacity);
+    if (currentMode === 'user' && ad > 1.5) wrapper.style.opacity = 0.4;
+
     wrapper.style.visibility = isVisible ? 'visible' : 'hidden';
 
     wrapper.style.zIndex = String(1000 - Math.round(ad * 10));
@@ -505,9 +507,16 @@ function updatePositions_now() {
 
     if (slideCard) {
       const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
-      const shadowStyle = dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW;
-      slideCard.style.borderRadius = rounded + 'px';
-      slideCard.style.boxShadow = shadowStyle;
+const shadowStyle =
+  currentMode === 'user'
+    ? (ad < 0.5 ? CENTER_SHADOW : LITE_SHADOW)
+    : (dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW);
+
+slideCard.style.borderRadius = rounded + 'px';
+slideCard.style.boxShadow = shadowStyle;
+
+slideCard.style.willChange = ad < 1.5 ? 'transform' : '';
+
 
       slideCard.style.transformOrigin = isMobile ? '50% 50%' : '50% 100%';
 

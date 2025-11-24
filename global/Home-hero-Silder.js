@@ -907,12 +907,12 @@ function endDesktopDrag() {
 
 function setupEventHandlers() {
   // Wheel tuning (keep old logic; just smoother values)
-  let wheelV = 0, wheelRAF = null, wheelAnimating = false;
-  const WHEEL_ACCEL    = 0.0012;  // lower sensitivity
-  const WHEEL_FRICTION = 0.90;    // less glide
-  const WHEEL_MIN_V    = 0.0015;  // stop threshold
-  const WHEEL_MAX_V    = 0.18;    // lower top speed
-  const PER_FRAME_VEL_CAP = 0.12; // cap per-frame motion
+  let wheelV = 1, wheelRAF = null, wheelAnimating = false;
+  const WHEEL_ACCEL    = 0.001;  // lower sensitivity
+  const WHEEL_FRICTION = 0.9;    // less glide
+  const WHEEL_MIN_V    = 0.109;  // stop threshold
+  const WHEEL_MAX_V    = 0.9;    // lower top speed
+  const PER_FRAME_VEL_CAP = 0.32; // cap per-frame motion
   const DEADZONE_PX = 2;          // ignore tiny scrolls
 
   const inputs = [q('textInput'), q('textArea')].filter(Boolean);

@@ -379,28 +379,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // File upload → show loader in the thumbnail slot only
   fileInput?.addEventListener("change", async (e) => {
-    const incoming = Array.from(e.target.files || []);
-    if (!incoming.length) return;
+  const incoming = Array.from(e.target.files || []);
+  if (!incoming.length) return;
 
-    const remaining = Math.max(0, MAX_IMAGES - state.images.length);
-    const selected = incoming.slice(0, remaining);
-    const ignored = incoming.length - selected.length;
+  const remaining = Math.max(0, MAX_IMAGES - state.images.length);
+  const selected = incoming.slice(0, remaining);
+  const ignored = incoming.length - selected.length;
 
-    for (const f of selected) {
-      if (!isValidImageFile(f)) { flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); continue; }
-      const slot = createSlotLoader();
-      try {
-        const url = URL.createObjectURL(f);
-        await preloadImage(url);
-        if (slot) removeSlotLoader(slot);
-        state.images.push({ file: f, url });
-        updateState();
-        updateAddButtonState();
-      } finally {}
-    }
-    if (ignored > 0) flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
-    e.target.value = "";
-  });
+for (const f of selected) {
+  if (!isValidImageFile(f)) { 
+    flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); 
+    continue; 
+  }
+  const slot = createSlotLoader();
+  try {
+    const url = URL.createObjectURL(f);
+    await preloadImage(url);
+    if (slot) removeSlotLoader(slot);
+    state.images.push({ file: f, url, source: "user" }); // ✅ Mark as user
+    
+    // ✅ Pause carousel permanently until image removed
+    window.aiPhotoCarousel?.markUserUpload?.(url);
+    
+    updateState();
+    updateAddButtonState();
+  } finally {}
+}
+  if (ignored > 0) flashError(`You can upload up to ${MAX_IMAGES} images. Ignored ${ignored} file(s).`);
+  e.target.value = "";
+});
 
   // Generate click — NO overlay; only button text/state changes
   generateButton?.addEventListener("click", (e) => {

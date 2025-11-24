@@ -175,10 +175,21 @@ document.addEventListener("DOMContentLoaded", () => {
       close.className = "image-close";
       close.setAttribute("aria-label", "Remove image");
       close.textContent = "×";
+      const isMobile = window.innerWidth < 768;
       Object.assign(close.style, {
-        position: "absolute", top: "4px", right: "6px", background: "rgba(0,0,0,0.55)", color: "#fff",
-        border: "0", borderRadius: "12px", width: "20px", height: "20px", lineHeight: "20px", cursor: "pointer"
+        position: "absolute", top: "4px", right: "6px", background: "rgba(0,0,0,0.75)", color: "#fff",
+        border: "0", borderRadius: "12px", width: "20px", height: "20px", lineHeight: "20px", cursor: "pointer",
+        opacity: isMobile ? "1" : "0.8",  // Always visible on mobile
+        transition: "opacity 0.2s ease"
       });
+
+      // Make close button always visible on mobile, show on hover for desktop
+      if (!isMobile) {
+        close.style.opacity = "0";
+        div.addEventListener("mouseenter", () => { close.style.opacity = "1"; });
+        div.addEventListener("mouseleave", () => { close.style.opacity = "0"; });
+      }
+
       close.addEventListener("click", (e) => {
         // Prevent event from bubbling
         e.stopPropagation();

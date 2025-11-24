@@ -612,7 +612,6 @@ function setUserActive(active) {
   isUserActive = active;
   if (active) pauseRotation();
   else setTimeout(() => { 
-    // ✅ Only restart if user hasn't taken control AND no user images present
     if (!isUserActive && !isDragging && !userHasTakenControl && !hasUserOwnedImages()) {
       startRotation();
     }
@@ -918,7 +917,8 @@ function setupEventHandlers() {
 
   const inputs = [q('textInput'), q('textArea')].filter(Boolean);
 
- inputs.forEach(input => {
+
+inputs.forEach(input => {
   input.addEventListener('focus', () => {
     setUserActive(true);
 
@@ -927,6 +927,7 @@ function setupEventHandlers() {
       switchToMultiline();
     }
 
+    // Only inject carousel image and enable zoom if user hasn't uploaded their own
     if (!userHasTakenControl) {
       expandPrompt();
 
@@ -950,69 +951,61 @@ function setupEventHandlers() {
 
         // Only inject if: multiline, no user images, no existing thumbnails
         if (multiline && !userHasImgs && !anyThumbs) {
-          addCurrentSlideImage(); // ← SINGLE CALL, handles everything
+          addCurrentSlideImage();
         }
 
-        // Enable zoom
+        // Enable zoom ONLY when using carousel images
         isFocusZoomed = (!isMobile && !isSingleLineMode);
         requestAnimationFrame(updatePositions);
       }, 80);
-    } else {
-      isFocusZoomed = (!isMobile && !isSingleLineMode);
-      updatePositions();
     }
+    // When user has uploaded their own image, zoom stays disabled
   });
 
-input.addEventListener('blur', (e) => {
-  if (suppressNextBlur) return; // ignore synthetic blur caused by input swap
-  const container = q('searchContainer');
-  const addBtn = q('addButton');
-  const genBtn = q('generateButton');
-  const rt = e.relatedTarget;
+  input.addEventListener('blur', (e) => {
+    if (suppressNextBlur) return;
+    const container = q('searchContainer');
+    const addBtn = q('addButton');
+    const genBtn = q('generateButton');
+    const rt = e.relatedTarget;
 
-  // Treat textarea, container, and upload buttons as "inside"
-  const focusStayedInside =
-    (rt && container && isInside(container, rt)) ||
-    (rt && addBtn && isInside(addBtn, rt)) ||
-    (rt && genBtn && isInside(genBtn, rt));
+    const focusStayedInside =
+      (rt && container && isInside(container, rt)) ||
+      (rt && addBtn && isInside(addBtn, rt)) ||
+      (rt && genBtn && isInside(genBtn, rt));
 
-  if (!focusStayedInside) {
-    setUserActive(false);
-    isFocusZoomed = false;
-    updatePositions();
+    if (!focusStayedInside) {
+      setUserActive(false);
+      isFocusZoomed = false;
+      updatePositions();
 
-    injectToken++;
-    if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
-    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+      injectToken++;
+      if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
+      if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
 
-    switchToSingleLine();
-    window.searchFeature?.clearImages('all');
-  }
-});
-
-
-
+      switchToSingleLine();
+      window.searchFeature?.clearImages('all');
+    }
+  });
 
   input.addEventListener('input', (e) => {
     handleUserInput(e.target.value);
   });
 
- input.addEventListener('click', () => {
+  input.addEventListener('click', () => {
     if (!userHasTakenControl) {
       expandPrompt();
 
-    // If the user already has images, do NOT inject ours
-    if (hasUserOwnedImages()) return;
+      // If the user already has images, do NOT inject ours
+      if (hasUserOwnedImages()) return;
 
-    injectToken++;
-    if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
+      injectToken++;
+      if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
 
-    addCurrentSlideImage();
-    injectCurrentImageURL();
-  }
-});
-
+      addCurrentSlideImage();
+    }
   });
+});
 
   [q('addButton'), q('generateButton')].filter(Boolean).forEach(button => {
     button.setAttribute('tabindex', '0');
@@ -1222,7 +1215,9 @@ window.aiPhotoCarousel = {
 markUserUpload(url) {
   userHasTakenControl = true;
   window.searchFeature?.clearImages('carousel');
-  pauseRotation(); // fully stop auto-rotation
+  pauseRotation();
+  isFocusZoomed = false;                    // ✅ Exit zoom
+  requestAnimationFrame(updatePositions);    // ✅ Update dimensions
   if (!isSingleLineMode) scheduleSyncBackend();
 }
 };

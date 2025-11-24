@@ -111,26 +111,36 @@ let currentMode = 'auto';
 const SNAP_DURATION = 300;
 const AUTO_TRANSFORM_MS = 700;
 
-function setModeAuto()     { currentMode = 'auto'; }
-function setModeUser()     { currentMode = 'user'; }
-function setModeSnapping() { currentMode = 'snapping'; }
+// --- Apply transitions once per mode change (instead of every frame)
+let lastMode = null;
+function applyTransitionsOnModeChange() {
+  if (lastMode === currentMode) return;
+  lastMode = currentMode;
 
-function applyWrapperTransition(wrapper) {
   const sizeFade = 'width 300ms ease, height 300ms ease, opacity 300ms ease';
-  if (currentMode === 'auto') {
-    wrapper.style.transition = `transform ${AUTO_TRANSFORM_MS}ms ease-out, ${sizeFade}`;
-  } else {
-    wrapper.style.transition = sizeFade;
-  }
-  const card = wrapper.querySelector('.slide-card');
-  if (card) {
-    card.style.transition = `transform ${FOCUS_TRANSITION_MS}ms ease`;
-  }
-  const img = wrapper.querySelector('.slide-card-single-img');
-  if (img) {
-    img.style.transition = `object-position ${FOCUS_TRANSITION_MS}ms ease, border-radius 300ms ease`;
-  }
+  const trackTrans = currentMode === 'auto'
+    ? `transform ${AUTO_TRANSFORM_MS}ms ease-out, ${sizeFade}`
+    : sizeFade;
+
+  slideElements.forEach(({ wrapper, slideCard, slideImage }) => {
+    if (wrapper)   wrapper.style.transition   = trackTrans;
+    if (slideCard) slideCard.style.transition = `transform ${FOCUS_TRANSITION_MS}ms ease`;
+    if (slideImage) {
+      slideImage.style.transition =
+        `object-position ${FOCUS_TRANSITION_MS}ms ease, border-radius 300ms ease`;
+    }
+  });
 }
+
+
+function setModeAuto()     { currentMode = 'auto';     applyTransitionsOnModeChange(); }
+function setModeUser()     { currentMode = 'user';     applyTransitionsOnModeChange(); }
+function setModeSnapping() { currentMode = 'snapping'; applyTransitionsOnModeChange(); }
+
+
+// (Deprecated) Transitions are now applied globally on mode change.
+function applyWrapperTransition(_) {}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // UTIL
@@ -453,10 +463,12 @@ function initCarousel() {
   // Start centered on index 0 for first init; handleResize() may overwrite.
   currentOffset = 0;
 
-  // Initial layout + prompt + backend sync
-  requestUpdate();
-  setTimeout(updatePrompt, 100);
-  scheduleSyncBackend();
+// Initial layout + prompt + backend sync
+applyTransitionsOnModeChange();
+requestUpdate();
+setTimeout(updatePrompt, 100);
+scheduleSyncBackend();
+
 }
 
 
@@ -464,10 +476,9 @@ function initCarousel() {
 
 function updatePositions_now() {
   slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
-    applyWrapperTransition(wrapper);
+   
 
-    const dSigned = getSignedDistance(absoluteIndex, currentOffset);
-    const ad = Math.abs(dSigned);
+    const ad = Math.abs(getSignedDistance(absoluteIndex, currentOffset));
     const position = getCardPosition(absoluteIndex, currentOffset);
     const isVisible = ad <= 3.5;
     const dimensions = getDimsFromDistance(ad);

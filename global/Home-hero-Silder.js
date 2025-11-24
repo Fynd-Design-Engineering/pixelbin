@@ -85,6 +85,18 @@ const FOCUS_SCALE = 1;          // 1.3x scale on center card
 const FOCUS_SPREAD = 4;        // neighbors push outward to make room
 const FOCUS_TRANSITION_MS = 750;  // scale/landscape transition
 
+// ---- Single-RAF scheduler ----
+let __frameScheduled = false;
+function requestUpdate() {
+  if (__frameScheduled) return;
+  __frameScheduled = true;
+  requestAnimationFrame(() => {
+    __frameScheduled = false;
+    updatePositions_now(); // will define below
+  });
+}
+
+
 // Helper: zoom is active only when not mobile and focus-zoom flag is on
 // Zoom ONLY on desktop and ONLY in MULTILINE mode
 const zoomActive = () => (!isMobile && isFocusZoomed && !isSingleLineMode);
@@ -442,7 +454,7 @@ function initCarousel() {
   currentOffset = 0;
 
   // Initial layout + prompt + backend sync
-  updatePositions();
+  requestUpdate();
   setTimeout(updatePrompt, 100);
   scheduleSyncBackend();
 }
@@ -450,74 +462,68 @@ function initCarousel() {
 
 
 
-function updatePositions() {
-  requestAnimationFrame(() => {
-    slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
-      applyWrapperTransition(wrapper);
+function updatePositions_now() {
+  slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
+    applyWrapperTransition(wrapper);
 
-      const dSigned = getSignedDistance(absoluteIndex, currentOffset);
-      const ad = Math.abs(dSigned);
-      const position = getCardPosition(absoluteIndex, currentOffset);
-      const isVisible = ad <= 3.5;
-      const dimensions = getDimsFromDistance(ad);
-      
+    const dSigned = getSignedDistance(absoluteIndex, currentOffset);
+    const ad = Math.abs(dSigned);
+    const position = getCardPosition(absoluteIndex, currentOffset);
+    const isVisible = ad <= 3.5;
+    const dimensions = getDimsFromDistance(ad);
 
-      wrapper.style.overflow = 'visible';
-      wrapper.style.width = dimensions.width + 'px';
-      wrapper.style.height = dimensions.height + 'px';
-      wrapper.style.opacity = String(dimensions.opacity);
-      wrapper.style.visibility = isVisible ? 'visible' : 'hidden';
+    wrapper.style.overflow = 'visible';
+    wrapper.style.width = dimensions.width + 'px';
+    wrapper.style.height = dimensions.height + 'px';
+    wrapper.style.opacity = String(dimensions.opacity);
+    wrapper.style.visibility = isVisible ? 'visible' : 'hidden';
 
-      // Layering so center is above neighbors
-      wrapper.style.zIndex = String(1000 - Math.round(ad * 10));
+    wrapper.style.zIndex = String(1000 - Math.round(ad * 10));
 
-      if (isMobile) {
-  wrapper.style.bottom = '';
-  wrapper.style.top = '50%';            // center reference point
-  wrapper.style.left = '50%';
-  wrapper.style.transform = `translate3d(-50%, calc(-50% + ${position}px), 0)`; 
+    if (isMobile) {
+      wrapper.style.bottom = '';
+      wrapper.style.top = '50%';
+      wrapper.style.left = '50%';
+      wrapper.style.transform = `translate3d(-50%, calc(-50% + ${position}px), 0)`;
+    } else {
+      wrapper.style.left = '50%';
+      wrapper.style.bottom = '22%';
+      wrapper.style.top = '';
+      wrapper.style.transform = `translate3d(${position}px, 0, 0) translateX(-50%)`;
+    }
+
+    if (slideCard) {
+      const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
+      const shadowStyle = dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW;
+      slideCard.style.borderRadius = rounded + 'px';
+      slideCard.style.boxShadow = shadowStyle;
+
+      slideCard.style.transformOrigin = isMobile ? '50% 50%' : '50% 100%';
+
+      const scale = (zoomActive() && ad < 0.5) ? FOCUS_SCALE : 1;
+      slideCard.style.transform = `scale(${scale})`;
+    }
+
+    if (slideImage) {
+      const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
+      slideImage.style.borderRadius = rounded + 'px';
+
+      if (zoomActive() && ad < 0.5) {
+        slideImage.style.objectFit = 'cover';
+        slideImage.style.objectPosition = '50% 45%';
       } else {
-        wrapper.style.left = '50%';
-        wrapper.style.bottom = '22%';
-        wrapper.style.top = '';
-        wrapper.style.transform = `translate3d(${position}px, 0, 0) translateX(-50%)`;
+        slideImage.style.objectPosition = '50% 50%';
       }
-
-      if (slideCard) {
-        const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
-        const shadowStyle = dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW;
-        slideCard.style.borderRadius = rounded + 'px';
-        slideCard.style.boxShadow = shadowStyle;
-
-        // Anchor bottom so scale grows upward (desktop), center on mobile
-        slideCard.style.transformOrigin = isMobile ? '50% 50%' : '50% 100%';
-
-        // Scale only on desktop and only for center card
-        const scale = (zoomActive() && ad < 0.5) ? FOCUS_SCALE : 1;
-        slideCard.style.transform = `scale(${scale})`;
-      }
-
-      if (slideImage) {
-        const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
-        slideImage.style.borderRadius = rounded + 'px';
-
-        // Subtle upward framing only when desktop zoom is active
-        if (zoomActive() && ad < 0.5) {
-          slideImage.style.objectFit = 'cover';
-          slideImage.style.objectPosition = '50% 45%';
-        } else {
-          slideImage.style.objectPosition = '50% 50%';
-        }
-      }
-    });
-
-    const currIdx = Math.round(currentOffset);
-    if (currIdx !== _lastRoundedIndex) {
-        _lastRoundedIndex = currIdx;
-         updatePrompt();
-          }
+    }
   });
+
+  const currIdx = Math.round(currentOffset);
+  if (currIdx !== _lastRoundedIndex) {
+    _lastRoundedIndex = currIdx;
+    updatePrompt();
+  }
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // NAVIGATION + RESIZE
@@ -536,7 +542,7 @@ function smoothSnapTo(targetOffset) {
     const k = Math.min(1, (now - start) / SNAP_DURATION);
     const e = 1 - Math.pow(1 - k, 4);
     currentOffset = from + delta * e;
-    updatePositions();
+    requestUpdate();
 
     if (k < 1) {
       snapRaf = requestAnimationFrame(tick);
@@ -545,7 +551,7 @@ function smoothSnapTo(targetOffset) {
       currentOffset = targetOffset;
       setModeAuto();
       setUserActive(false);
-      updatePositions();
+      requestUpdate();
       updatePrompt();
     }
   };
@@ -586,12 +592,12 @@ function handleResize() {
     const keep = Math.round(currentOffset);
     initCarousel();
     currentOffset = keep;
-    updatePositions();
+    requestUpdate();
 
     const track = q('slider-track');
     if (track) track.style.cursor = isMobile ? '' : 'grab';
   } else {
-    updatePositions();
+    requestUpdate();
   }
 }
 
@@ -605,7 +611,7 @@ function startRotation() {
     if (!isUserActive && !isSnapping && !isDragging) {
       setModeAuto();
       currentOffset = Math.round(currentOffset) + 1;
-      updatePositions();
+      requestUpdate();
       updatePrompt();
     }
   }, ROTATION_DELAY);
@@ -732,7 +738,7 @@ function switchToMultiline() {
   }
 
   isSingleLineMode = false;
-  requestAnimationFrame(updatePositions);
+  requestUpdate();
 }
 
 
@@ -778,7 +784,7 @@ function switchToSingleLine() {
 
   isSingleLineMode = true;
   setUserActive(false);
-  requestAnimationFrame(updatePositions);
+ requestUpdate();
 }
 
 
@@ -893,7 +899,7 @@ function onDesktopDragMove(e) {
   e.preventDefault();
   const dx = getClientX(e) - dragStartX;
   currentOffset = dragStartOffset + pxToOffset(+dx); // drag right → next slide, consistent with wheel
-  updatePositions();
+  requestUpdate();
 }
 
 function endDesktopDrag() {
@@ -966,7 +972,7 @@ inputs.forEach(input => {
 
         // Enable zoom ONLY when using carousel images
         isFocusZoomed = (!isMobile && !isSingleLineMode);
-        requestAnimationFrame(updatePositions);
+        requestUpdate();
       }, 80);
     }
     // When user has uploaded their own image, zoom stays disabled
@@ -987,7 +993,7 @@ inputs.forEach(input => {
     if (!focusStayedInside) {
       setUserActive(false);
       isFocusZoomed = false;
-      updatePositions();
+      requestUpdate();
 
       injectToken++;
       if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
@@ -1074,7 +1080,7 @@ inputs.forEach(input => {
     if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
 
     isFocusZoomed = false;
-    updatePositions();
+    requestUpdate();
 
     switchToSingleLine();
     window.searchFeature?.clearImages('all');
@@ -1091,7 +1097,7 @@ inputs.forEach(input => {
       if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
 
       isFocusZoomed = false;
-      updatePositions();
+      requestUpdate();
 
       switchToSingleLine();
       window.searchFeature?.clearImages('all');
@@ -1108,7 +1114,7 @@ inputs.forEach(input => {
     if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
 
     isFocusZoomed = false;
-    updatePositions();
+    requestUpdate();
 
     switchToSingleLine();
     window.searchFeature?.clearImages('all');
@@ -1158,7 +1164,7 @@ inputs.forEach(input => {
           if (wheelV < -PER_FRAME_VEL_CAP) wheelV = -PER_FRAME_VEL_CAP;
 
           currentOffset += wheelV;
-          updatePositions();
+          requestUpdate();
 
           // friction
           wheelV *= WHEEL_FRICTION;
@@ -1226,8 +1232,8 @@ markUserUpload(url) {
   userHasTakenControl = true;
   window.searchFeature?.clearImages('carousel');
   pauseRotation();
-  isFocusZoomed = false;                    // ✅ Exit zoom
-  requestAnimationFrame(updatePositions);    // ✅ Update dimensions
+  isFocusZoomed = false;                // ✅ Exit zoom
+  requestUpdate();     // ✅ Update dimensions
   if (!isSingleLineMode) scheduleSyncBackend();
 }
 };

@@ -76,6 +76,9 @@ let dragStartOffset = 0;
 
 let suppressNextBlur = false;
 
+let injectionInProgress = false;
+let lastInjectedSlideId = null;
+
 // Focus-zoom state & tuning (applies on DESKTOP only)
 let isFocusZoomed = false;
 const FOCUS_SCALE = 1;          // 1.3x scale on center card
@@ -328,12 +331,12 @@ function getDimsFromDistance(ad) {
       : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };   // desktop portrait
   } else if (ad < 1.5) {
     return isMobile
-      ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
-      : { width: 272, height: 340, opacity: 0.2, yOffset: 0, shadow: false };
+      ? { width: 240, height: 300, opacity: 0.7, yOffset: 0, shadow: false }
+      : { width: 272, height: 340, opacity: 0.7, yOffset: 0, shadow: false };
   }
   return isMobile
-    ? { width: 240, height: 300, opacity: 0.05, yOffset: 0, shadow: false }
-    : { width: 208, height: 260, opacity: 0.05, yOffset: 0, shadow: false };
+    ? { width: 240, height: 300, opacity: 0.2, yOffset: 0, shadow: false }
+    : { width: 208, height: 260, opacity: 0.2, yOffset: 0, shadow: false };
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -361,80 +364,89 @@ function createSlideHTML(slide, dimensions) {
 }
 
 function initCarousel() {
-  log('🔄 Initializing carousel...');
+  log('🔄 Initializing carousel (9 cards)…');
   sliderTrack = q('slider-track');
   if (!sliderTrack) { console.error('❌ Slider track not found!'); return; }
 
   sliderTrack.innerHTML = '';
   slideElements = [];
 
-  for (let set = 0; set < 3; set++) {
-    slides.forEach((slide, idx) => {
-      const absoluteIndex = -slides.length + set * slides.length + idx;
-      const dims = getDimsFromDistance(Math.abs(getSignedDistance(absoluteIndex, 0)));
+  // Build ONE instance of each slide (no triplication)
+  slides.forEach((slide, idx) => {
+    const absoluteIndex = idx; // single set: 0..8
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'slide-card-wrapper';
-      wrapper.dataset.absoluteIndex = String(absoluteIndex);
+    // Distance from center when offset = 0, to decide initial size/priority
+    const dist0 = Math.abs(getSignedDistance(absoluteIndex, 0));
+    const dims = getDimsFromDistance(dist0);
 
-      const cardContainer = document.createElement('div');
-      cardContainer.style.cssText = 'width:100%;height:100%;';
-      cardContainer.innerHTML = createSlideHTML(slide, dims);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'slide-card-wrapper';
+    wrapper.dataset.absoluteIndex = String(absoluteIndex);
+    // keep overflow visible so neighbors can overlap gracefully
+    wrapper.style.overflow = 'visible';
 
-      wrapper.appendChild(cardContainer);
-      sliderTrack.appendChild(wrapper);
+    const cardContainer = document.createElement('div');
+    cardContainer.style.cssText = 'width:100%;height:100%;';
 
-      const slideCard  = cardContainer.querySelector('.slide-card');
-      const slideImage = cardContainer.querySelector('.slide-card-single-img');
+    // Build card markup with correct rounded/shadow for initial distance
+    cardContainer.innerHTML = createSlideHTML(slide, dims);
 
-      slideElements.push({
-        wrapper,
-        cardContainer,
-        slide,
-        absoluteIndex,
-        slideCard,
-        slideImage
-      });
+    wrapper.appendChild(cardContainer);
+    sliderTrack.appendChild(wrapper);
 
-      // --- Assign optimized image variant + priorities ---
-      if (slideImage) {
-        // store the unmodified base URL once
-        slideImage.dataset.srcBase = slide.images[0];
+    const slideCard  = cardContainer.querySelector('.slide-card');
+    const slideImage = cardContainer.querySelector('.slide-card-single-img');
 
-        const dist0 = Math.abs(getSignedDistance(absoluteIndex, 0));
-        // Priority hints BEFORE setting src
-        if (dist0 < 1.5) {
-          slideImage.loading = 'eager';
-          slideImage.decoding = 'async';
-          slideImage.fetchPriority = 'high';
-        } else {
-          slideImage.loading = 'lazy';
-          slideImage.decoding = 'async';
-          slideImage.fetchPriority = 'low';
-        }
-
-        // Choose size by distance from center
-        if (dist0 < 0.5) {
-          slideImage.src = largeVariant(slideImage.dataset.srcBase);
-        } else if (dist0 < 1.5) {
-          slideImage.src = smallVariant(slideImage.dataset.srcBase);
-        } else {
-          slideImage.src = tinyVariant(slideImage.dataset.srcBase);
-        }
-
-        // Pre-decode near-center to avoid first-motion jank
-        if (dist0 < 1.5) {
-          Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
-        }
-      }
+    slideElements.push({
+      wrapper,
+      cardContainer,
+      slide,
+      absoluteIndex,
+      slideCard,
+      slideImage
     });
-  }
 
+    // ---------- Image source & priority tuning ----------
+    if (slideImage) {
+      // Store the unmodified base once
+      slideImage.dataset.srcBase = slide.images[0];
+
+      // Priority hints BEFORE setting src
+      if (dist0 < 1.5) {
+        slideImage.loading = 'eager';
+        slideImage.decoding = 'async';
+        slideImage.fetchPriority = 'high';
+      } else {
+        slideImage.loading = 'lazy';
+        slideImage.decoding = 'async';
+        slideImage.fetchPriority = 'low';
+      }
+
+      // Choose size by distance from center
+      if (dist0 < 0.5) {
+        slideImage.src = largeVariant(slideImage.dataset.srcBase);
+      } else if (dist0 < 1.5) {
+        slideImage.src = smallVariant(slideImage.dataset.srcBase);
+      } else {
+        slideImage.src = tinyVariant(slideImage.dataset.srcBase);
+      }
+
+      // Pre-decode near-center to avoid first-motion jank
+      if (dist0 < 1.5) {
+        Promise.resolve().then(() => slideImage.decode?.().catch(() => {}));
+      }
+    }
+  });
+
+  // Start centered on index 0 for first init; handleResize() may overwrite.
   currentOffset = 0;
+
+  // Initial layout + prompt + backend sync
   updatePositions();
   setTimeout(updatePrompt, 100);
   scheduleSyncBackend();
 }
+
 
 
 
@@ -807,8 +819,6 @@ function shouldShowImage() {
   return searchForm && searchForm.classList.contains('multi-line');
 }
 
-let injectionInProgress = false;
-let lastInjectedSlideId = null;
 
 async function addCurrentSlideImage() {
   const currentSlide = getCurrentSlide();
@@ -907,7 +917,7 @@ function endDesktopDrag() {
 
 function setupEventHandlers() {
   // Wheel tuning (keep old logic; just smoother values)
-  let wheelV = 1, wheelRAF = null, wheelAnimating = false;
+  let wheelV = 0, wheelRAF = null, wheelAnimating = false;
   const WHEEL_ACCEL    = 0.002;  // lower sensitivity
   const WHEEL_FRICTION = 0.63;    // less glide
   const WHEEL_MIN_V    = 0.109;  // stop threshold

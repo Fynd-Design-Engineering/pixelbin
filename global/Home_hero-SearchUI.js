@@ -1,4 +1,4 @@
-
+// ===== MAIN UI CONTROLLER =====
 document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("searchContainer");
   if (!container) { console.error("[UI] #searchContainer not found"); return; }
@@ -6,89 +6,64 @@ document.addEventListener("DOMContentLoaded", () => {
   const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
   const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
   const HINT_ON_SUBMIT_ONLY = true;
-
-  // Loader image (will render INSIDE the thumbnail slot only)
   const LOADER_URL = "https://cdn.prod.website-files.com/673193e0642e6ad25696fcd4/6921902dc9c1daf39440e804_image%20(8).png";
 
-  // Only require an image if the FIRST word is one of these actions
   const ACTION_FIRST_WORDS = ["remove","erase","delete","replace","edit","upscale"];
-  function keywordNeedsImage(text) {
+  const keywordNeedsImage = (text) => {
     if (!text) return false;
     const first = (text.trim().toLowerCase().match(/^[^\p{L}\p{N}]*(\p{L}+)/u) || [,""])[1];
     return ACTION_FIRST_WORDS.includes(first);
-  }
+  };
 
   // DOM refs
-  const form = document.getElementById("searchForm");
-  const formContent = document.getElementById("formContent");
-  const imagesSection = document.getElementById("imagesSection");
-  const textInput = document.getElementById("textInput");
-  const textArea = document.getElementById("textArea");
-  const toolbar = document.getElementById("toolbar");
-  const addButton = document.getElementById("addButton");
-  const generateButton = document.getElementById("generateButton");
+  const q = (id) => document.getElementById(id);
+  const form = q("searchForm"), formContent = q("formContent"), imagesSection = q("imagesSection");
+  const textInput = q("textInput"), textArea = q("textArea"), toolbar = q("toolbar");
+  const addButton = q("addButton"), generateButton = q("generateButton");
   const generateText = generateButton?.querySelector(".generate-text");
-  const tooltip = document.getElementById("tooltip");
-  const fileInput = document.getElementById("fileInput");
-  const charCounter = document.getElementById("charCounter");
+  const tooltip = q("tooltip"), fileInput = q("fileInput"), charCounter = q("charCounter");
 
   // Image constraints
   const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
   const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"];
-  const MAX_MB = 25;
-  const MAX_IMAGES = 1;
+  const MAX_MB = 25, MAX_IMAGES = 1;
 
   // State
   const state = {
     inputValue: "",
-    images: [],                // [{ file|null, url, slideKey?, source? }]
+    images: [],
     active: false,
     mode: "empty",
     maxChars: MAX_CHARS,
-    loadingImage: false,       // only while a thumbnail-slot loader is active
-    isGenerating: false,       // "Generate" -> "Generating…"
+    loadingImage: false,
+    isGenerating: false,
   };
 
-  function setGenerating(on) { state.isGenerating = !!on; updateUI(false); }
+  const setGenerating = (on) => { state.isGenerating = !!on; updateUI(false); };
 
-  // ===== Live DOM sync helpers =====
-  function activeEditor() {
-    if (textArea && !textArea.classList.contains("hidden")) return textArea;
-    return textInput;
-  }
-  function getLivePrompt() {
-    const el = activeEditor();
-    return el ? String(el.value || "") : state.inputValue || "";
-  }
-  function syncPromptFromDOM() {
+  // Helpers
+  const activeEditor = () => textArea && !textArea.classList.contains("hidden") ? textArea : textInput;
+  const getLivePrompt = () => activeEditor()?.value || state.inputValue || "";
+  const syncPromptFromDOM = () => {
     const live = getLivePrompt();
-    if (live !== state.inputValue) {
-      state.inputValue = live;
-      updateState();
-    }
-  }
-  // ===== Submit-time full prompt restore (fix truncation) =====
-  function truncateForUI(text, max = 64) {
-    if (!text) return "";
-    if (text.length <= max) return text;
-    return text.substring(0, max).trim() + "...";
-  }
-  function resolvePromptForSubmit(liveValue) {
+    if (live !== state.inputValue) { state.inputValue = live; updateState(); }
+  };
+
+  const truncateForUI = (text, max = 64) => !text || text.length <= max ? text : text.substring(0, max).trim() + "...";
+
+  const resolvePromptForSubmit = (liveValue) => {
     try {
       const raw = window.aiPhotoCarousel?.getStoredPrompt?.() || "";
       if (!raw) return liveValue;
-
       const truncated = truncateForUI(raw, 64);
       if (liveValue === truncated) return raw;
-
       if (/\.\.\.$/.test(liveValue)) {
         const base = liveValue.replace(/\.\.\.$/, "").trim();
         if (base && raw.startsWith(base)) return raw;
       }
     } catch {}
     return liveValue;
-  }
-  // ========================================
+  };
 
   // Validation
   const isValidImageFile = (f) => {
@@ -99,8 +74,8 @@ document.addEventListener("DOMContentLoaded", () => {
            f.size <= MAX_MB * 1024 * 1024;
   };
 
-  // Convert external URL → File (for upload path)
-  async function externalUrlToFile(url, slideKey = "carousel") {
+  // Convert external URL to File
+  const externalUrlToFile = async (url, slideKey = "carousel") => {
     const res = await fetch(url, { mode: "cors", credentials: "omit" });
     if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
     const blob = await res.blob();
@@ -108,75 +83,57 @@ document.addEventListener("DOMContentLoaded", () => {
     const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
     const safeKey = (slideKey || "carousel").toLowerCase().replace(/[^\w-]+/g, "-");
     return new File([blob], `carousel-${safeKey}-${Date.now()}.${ext}`, { type: mime });
-  }
+  };
 
-  // Image preloader
-  function preloadImage(url) {
-    return new Promise((resolve) => {
-      const i = new Image();
-      i.onload = () => resolve(true);
-      i.onerror = () => resolve(false);
-      i.src = url;
-    });
-  }
+  // Preload image
+  const preloadImage = (url) => new Promise((resolve) => {
+    const i = new Image();
+    i.onload = () => resolve(true);
+    i.onerror = () => resolve(false);
+    i.src = url;
+  });
 
-  // ===== Thumbnail-slot loader (ONLY where the image will appear) =====
-  function createSlotLoader() {
+  // Slot loader
+  const createSlotLoader = () => {
     if (!imagesSection) return null;
     imagesSection.classList.remove("hidden");
-
     const slot = document.createElement("div");
     slot.className = "image-thumbnail loading-slot";
     Object.assign(slot.style, {
-      position: "relative",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "rgba(0,0,0,0.04)",
-      borderRadius: "8px",
-      minWidth: "72px",
-      minHeight: "72px",
-      overflow: "hidden",
+      position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.04)", borderRadius: "8px", minWidth: "72px", minHeight: "72px", overflow: "hidden"
     });
-
     const spin = document.createElement("img");
     spin.src = LOADER_URL;
     spin.alt = "Loading…";
     Object.assign(spin.style, { width: "48px", height: "48px", objectFit: "contain", opacity: "0.85" });
     slot.appendChild(spin);
-
     imagesSection.appendChild(slot);
     state.loadingImage = true;
     updateUI(false);
     return slot;
-  }
-  function removeSlotLoader(slot) {
-    if (slot && slot.parentNode) slot.parentNode.removeChild(slot);
+  };
+
+  const removeSlotLoader = (slot) => {
+    if (slot?.parentNode) slot.parentNode.removeChild(slot);
     state.loadingImage = false;
     updateUI(false);
-  }
-  // ===================================================================
+  };
 
-  // Helpers for images
-  function hasExternalImage(url, slideKey) {
-    return state.images.some(x => x.url === url || (slideKey && x.slideKey === slideKey));
-  }
+  // Image management
+  const hasExternalImage = (url, slideKey) => state.images.some(x => x.url === url || (slideKey && x.slideKey === slideKey));
 
-  async function addExternalImage(url, slideKey, source = "carousel") {
-    if (!url) return;
-    if (state.images.length >= MAX_IMAGES) return;
-    if (hasExternalImage(url, slideKey)) return;
-
+  const addExternalImage = async (url, slideKey, source = "carousel") => {
+    if (!url || state.images.length >= MAX_IMAGES || hasExternalImage(url, slideKey)) return;
     const slot = createSlotLoader();
     await preloadImage(url);
     if (slot) removeSlotLoader(slot);
-
     state.images.push({ file: null, url, slideKey, source });
     updateState();
     updateAddButtonState();
-  }
+  };
 
-  function clearImagesByScope(scope = "all") {
+  const clearImagesByScope = (scope = "all") => {
     if (scope === "carousel") {
       state.images = state.images.filter((x) => x.source !== "carousel");
     } else {
@@ -185,15 +142,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     updateState();
     updateAddButtonState();
-  }
+  };
 
-  // Textarea rows rule: 2 rows if image present, else 5
-  function applyTextAreaRows() {
-    if (!textArea) return;
-    textArea.rows = state.images.length > 0 ? 2 : 5;
-  }
+  // Textarea rows
+  const applyTextAreaRows = () => { if (textArea) textArea.rows = state.images.length > 0 ? 2 : 5; };
 
-  // Responsive tweaks
+  // Responsive
   const setMobileStyles = () => {
     const isMobile = window.innerWidth < 768;
     container.classList.toggle("mobile", isMobile);
@@ -215,7 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form?.classList.toggle("over-limit", len > state.maxChars);
   };
 
-  function updateAddButtonState() {
+  const updateAddButtonState = () => {
     const blocked = state.images.length >= MAX_IMAGES || state.loadingImage || state.isGenerating;
     if (addButton) {
       addButton.disabled = blocked;
@@ -223,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
       addButton.setAttribute("aria-disabled", String(blocked));
     }
     if (state.images.length >= MAX_IMAGES) hideImageHint();
-  }
+  };
 
   // Render thumbnails
   const renderImages = () => {
@@ -232,14 +186,11 @@ document.addEventListener("DOMContentLoaded", () => {
     state.images.forEach((img, idx) => {
       const div = document.createElement("div");
       div.className = "image-thumbnail";
-      div.style.backgroundImage = `url(${img.url})`;
-      div.style.backgroundSize = "cover";
-      div.style.backgroundPosition = "center";
-      div.style.borderRadius = "8px";
-      div.style.minWidth = "72px";
-      div.style.minHeight = "72px";
-      div.style.position = "relative";
-      if (img.source)   div.dataset.source   = img.source;
+      Object.assign(div.style, {
+        backgroundImage: `url(${img.url})`, backgroundSize: "cover", backgroundPosition: "center",
+        borderRadius: "8px", minWidth: "72px", minHeight: "72px", position: "relative"
+      });
+      if (img.source) div.dataset.source = img.source;
       if (img.slideKey) div.dataset.slideKey = img.slideKey;
       div.dataset.url = img.url;
 
@@ -249,8 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
       close.setAttribute("aria-label", "Remove image");
       close.textContent = "×";
       Object.assign(close.style, {
-        position: "absolute", top: "4px", right: "6px",
-        background: "rgba(0,0,0,0.55)", color: "#fff",
+        position: "absolute", top: "4px", right: "6px", background: "rgba(0,0,0,0.55)", color: "#fff",
         border: "0", borderRadius: "12px", width: "20px", height: "20px", lineHeight: "20px", cursor: "pointer"
       });
       close.addEventListener("click", () => {
@@ -267,10 +217,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
-  // Layout switching without animation jank
-  function switchLayoutWithoutAnimation(multi) {
+  // Layout switching
+  const switchLayoutWithoutAnimation = (multi) => {
     const els = [form, formContent, toolbar];
-    const prevTransitions = els.map((el) => (el ? el.style.transition : ""));
+    const prevTransitions = els.map((el) => el?.style.transition || "");
     els.forEach((el) => { if (el) el.style.transition = "none"; });
 
     form?.classList.toggle("multi-line", multi);
@@ -282,7 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     form?.offsetHeight;
     requestAnimationFrame(() => { els.forEach((el, i) => { if (el) el.style.transition = prevTransitions[i] || ""; }); });
-  }
+  };
 
   // UI update
   const updateUI = (flipLayout = false) => {
@@ -321,11 +271,9 @@ document.addEventListener("DOMContentLoaded", () => {
       generateButton.disabled = !canGenerate;
       generateButton.classList.toggle("is-generating", state.isGenerating);
       generateButton.setAttribute("aria-busy", String(state.isGenerating));
-      if (generateText) {
-        generateText.textContent = state.isGenerating ? "Generating…" : "Generate";
-      } else {
-        generateButton.textContent = state.isGenerating ? "Generating…" : "Generate";
-      }
+      const text = state.isGenerating ? "Generating…" : "Generate";
+      if (generateText) generateText.textContent = text;
+      else generateButton.textContent = text;
     }
 
     updateAddButtonState();
@@ -334,14 +282,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // State recompute
   const updateState = () => {
     const prevMode = state.mode;
+    const formIsMultiline = form?.classList.contains('multi-line');
+
     if (state.images.length > 0) state.mode = "image-attached";
     else if (state.inputValue.length > 67) state.mode = "multiline";
     else if (state.inputValue.length > 0) state.mode = "filled";
     else if (state.active) state.mode = "active";
+    else if (formIsMultiline) state.mode = "multiline";
     else state.mode = "empty";
 
-    const layoutChanged = prevMode !== state.mode;
-    updateUI(layoutChanged);
+    updateUI(prevMode !== state.mode);
     updateCharCounter();
     applyTextAreaRows();
   };
@@ -350,18 +300,27 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", setMobileStyles);
   setMobileStyles();
 
-  textInput?.addEventListener("input", (e) => { state.inputValue = e.target.value; updateState(); });
-  textInput?.addEventListener("focus", () => { state.active = true; updateState(); });
-  textInput?.addEventListener("blur", () => { if (!state.inputValue && state.images.length === 0) { state.active = false; updateState(); } });
+  const handleInputChange = (e) => { state.inputValue = e.target.value; updateState(); };
+  const handleFocus = () => { state.active = true; updateState(); };
+  const handleBlur = () => {
+    const formIsMultiline = form?.classList.contains('multi-line');
+    if (!state.inputValue && state.images.length === 0 && !formIsMultiline) {
+      state.active = false;
+      updateState();
+    }
+  };
 
+  textInput?.addEventListener("input", handleInputChange);
+  textInput?.addEventListener("focus", handleFocus);
+  textInput?.addEventListener("blur", handleBlur);
   textArea?.addEventListener("input", (e) => { state.inputValue = e.target.value; applyTextAreaRows(); updateState(); });
-  textArea?.addEventListener("focus", () => { state.active = true; updateState(); });
-  textArea?.addEventListener("blur", () => { if (!state.inputValue && state.images.length === 0) { state.active = false; updateState(); } });
+  textArea?.addEventListener("focus", handleFocus);
+  textArea?.addEventListener("blur", handleBlur);
 
   // IME-safe syncing and Enter-to-submit
   [textInput, textArea].forEach(el => {
-    el?.addEventListener("compositionend", () => { syncPromptFromDOM(); });
-    el?.addEventListener("change", () => { syncPromptFromDOM(); });
+    el?.addEventListener("compositionend", syncPromptFromDOM);
+    el?.addEventListener("change", syncPromptFromDOM);
     el?.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
         e.preventDefault();
@@ -370,6 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Add button
   addButton?.addEventListener("click", () => {
     if (state.images.length >= MAX_IMAGES) { flashError(`Maximum ${MAX_IMAGES} images allowed.`); return; }
     fileInput?.click();
@@ -377,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
   addButton?.addEventListener("mouseenter", () => { addButton.classList.add("active"); if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show"); });
   addButton?.addEventListener("mouseleave", () => { addButton.classList.remove("active"); tooltip?.classList.remove("show"); });
 
-  // File upload → show loader in the thumbnail slot only
+  // File upload
   fileInput?.addEventListener("change", async (e) => {
     const incoming = Array.from(e.target.files || []);
     if (!incoming.length) return;
@@ -402,11 +362,10 @@ document.addEventListener("DOMContentLoaded", () => {
     e.target.value = "";
   });
 
-  // Generate click — NO overlay; only button text/state changes
+  // Generate click
   generateButton?.addEventListener("click", (e) => {
     e.preventDefault();
 
-    // Ensure latest text, then restore full prompt if carousel truncated it
     syncPromptFromDOM();
     const promptLive = state.inputValue.trim();
     const prompt = resolvePromptForSubmit(promptLive);
@@ -429,12 +388,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const studioRoute = `/studio/${TOOL_NAME}`;
-    setGenerating(true); // switch button to "Generating…"
+    setGenerating(true);
 
     // Prompt-only path
     if (!needs && files.length === 0 && !externalImageUrl) {
-      const redirectURL = pbBuildStudioRedirect(studioRoute, undefined, prompt);
-      window.location.href = redirectURL;
+      window.location.href = pbBuildStudioRedirect(studioRoute, undefined, prompt);
       return;
     }
 
@@ -456,8 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) => { try { setProgress?.(pct); } catch {} });
         if (!resp?.url) throw new Error("Upload succeeded but no URL returned");
 
-        const redirectURL = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
-        window.location.href = redirectURL;
+        window.location.href = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
       } catch (err) {
         console.error("[submit fail]", err);
         try { flashErrorInline?.(err?.message || "Upload failed. Please try again."); }
@@ -470,16 +427,15 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Error UI
-  function flashError(msg) {
+  const flashError = (msg) => {
     console.error(msg);
-    const box = document.getElementById("uploadError");
-    const txt = document.getElementById("uploadErrorText");
+    const box = q("uploadError"), txt = q("uploadErrorText");
     if (box && txt) { txt.textContent = msg; box.style.display = "block"; }
     form?.classList.add("error");
     setTimeout(() => form?.classList.remove("error"), 1200);
-  }
+  };
 
-  // Public API for carousel/chips
+  // Public API
   window.searchFeature = {
     setPrompt(text) {
       const next = text || "";
@@ -492,51 +448,43 @@ document.addEventListener("DOMContentLoaded", () => {
     clearImages(scope = "all") { clearImagesByScope(scope); },
   };
 
+  // Pill click handler
   document.addEventListener("click", (e) => {
     const pill = e.target.closest(".pb_input_pill");
     if (!pill) return;
     const prompt = (pill.dataset.prompt || pill.querySelector(".gen_text")?.textContent || "").trim();
-    if (!prompt) return;
-    window.searchFeature.setPrompt(prompt);
+    if (prompt) window.searchFeature.setPrompt(prompt);
   });
 });
 
-
-
-
+// ===== PIXELBIN ENV & UPLOAD =====
 (() => {
   const PB_DEBUG = true;
-
   const host = location.hostname;
-  const isStaging =
-    host.includes("webflow.io") || host.includes("pixelbinz0.de");
+  const isStaging = host.includes("webflow.io") || host.includes("pixelbinz0.de");
 
   const searchContainer = document.getElementById("searchContainer");
-  const dataset = searchContainer ? searchContainer.dataset : {};
+  const dataset = searchContainer?.dataset || {};
   const readDataset = (key) => {
     const value = dataset?.[key];
     return typeof value === "string" ? value.trim() : "";
   };
+
   const defaultClientKey = readDataset("clientKey");
-  const stagingClientKey =
-    readDataset("clientKeyStaging") || readDataset("stagingClientKey");
-  const productionClientKey =
-    readDataset("clientKeyProduction") || readDataset("productionClientKey");
+  const stagingClientKey = readDataset("clientKeyStaging") || readDataset("stagingClientKey");
+  const productionClientKey = readDataset("clientKeyProduction") || readDataset("productionClientKey");
   const resolvedProdKey = productionClientKey || defaultClientKey || "1234567";
-  const resolvedStagingKey =
-    stagingClientKey || defaultClientKey || resolvedProdKey;
+  const resolvedStagingKey = stagingClientKey || defaultClientKey || resolvedProdKey;
+
   const PB_ENV = {
-    API_URL: isStaging
-      ? "https://api.pixelbinz0.de/service/panel/assets/v1.0/upload/direct"
+    API_URL: isStaging ? "https://api.pixelbinz0.de/service/panel/assets/v1.0/upload/direct"
       : "https://api.pixelbin.io/service/panel/assets/v1.0/upload/direct",
-    SITE_KEY: isStaging
-      ? "6LeJwSsdAAAAACEftEzfp4h_f520nfzmrhbrc3Q3"
+    SITE_KEY: isStaging ? "6LeJwSsdAAAAACEftEzfp4h_f520nfzmrhbrc3Q3"
       : "6LcgwSsdAAAAAJO_QsCkkQuSlkOal2jqXic2Zuvj",
-    CONSOLE_BASE: isStaging
-      ? "https://console.pixelbinz0.de"
-      : "https://console.pixelbin.io",
+    CONSOLE_BASE: isStaging ? "https://console.pixelbinz0.de" : "https://console.pixelbin.io",
     CLIENT_KEY: isStaging ? resolvedStagingKey : resolvedProdKey,
   };
+
   window.PB_ENV = PB_ENV;
   if (PB_DEBUG) console.info("[PB_ENV]", PB_ENV);
 
@@ -544,32 +492,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!orgId) return PB_ENV.API_URL;
     try {
       const url = new URL(PB_ENV.API_URL);
-      url.pathname = url.pathname.replace(
-        /\/upload\/direct$/,
-        `/org/${encodeURIComponent(orgId)}/upload/direct`
-      );
+      url.pathname = url.pathname.replace(/\/upload\/direct$/, `/org/${encodeURIComponent(orgId)}/upload/direct`);
       return url.toString();
     } catch (e) {
-      if (PB_DEBUG)
-        console.error("[upload] failed to build org upload URL; using default", e);
+      if (PB_DEBUG) console.error("[upload] failed to build org upload URL; using default", e);
       return PB_ENV.API_URL;
     }
   };
 
   const hexSha256 = (s) => CryptoJS.SHA256(s).toString();
   const hexHmac = (k, s) => CryptoJS.HmacSHA256(s, k).toString();
-  const encRFC3986 = (s) =>
-    encodeURIComponent(s).replace(
-      /[!'()*]/g,
-      (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()
-    );
+  const encRFC3986 = (s) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 
   class PB_RequestSigner {
     constructor(req) {
       let u;
       if (typeof req === "string") u = new URL(req, location.origin);
-      else if (req.host && req.path)
-        u = new URL(req.path, `https://${req.host}`);
+      else if (req.host && req.path) u = new URL(req.path, `https://${req.host}`);
       else throw new TypeError("Invalid request");
       this.r = {
         method: req.method || (req.body ? "POST" : "GET"),
@@ -581,51 +520,29 @@ document.addEventListener("DOMContentLoaded", () => {
         query: Object.fromEntries(u.searchParams.entries()),
       };
       if (!this.r.headers.Host && !this.r.headers.host) {
-        this.r.headers.Host =
-          this.r.hostname + (this.r.port ? ":" + this.r.port : "");
+        this.r.headers.Host = this.r.hostname + (this.r.port ? ":" + this.r.port : "");
       }
     }
     _ts() {
-      return (this.__ts ||= new Date()
-        .toISOString()
-        .replace(/[:\-]|\.\d{3}/g, ""));
+      return (this.__ts ||= new Date().toISOString().replace(/[:\-]|\.\d{3}/g, ""));
     }
     _canonHeaders() {
-      const h = this.r.headers,
-        IGN = {
-          authorization: 1,
-          connection: 1,
-          "x-amzn-trace-id": 1,
-          "user-agent": 1,
-          expect: 1,
-          "presigned-expires": 1,
-          range: 1,
-        };
+      const h = this.r.headers, IGN = {
+        authorization: 1, connection: 1, "x-amzn-trace-id": 1, "user-agent": 1,
+        expect: 1, "presigned-expires": 1, range: 1
+      };
       const INC = ["x-ebg-.*", "host"];
       return Object.keys(h)
-        .filter(
-          (k) =>
-            !IGN[k.toLowerCase()] &&
-            INC.some((rx) => new RegExp(rx, "i").test(k))
-        )
+        .filter((k) => !IGN[k.toLowerCase()] && INC.some((rx) => new RegExp(rx, "i").test(k)))
         .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-        .map(
-          (k) =>
-            k.toLowerCase() + ":" + String(h[k]).trim().replace(/\s+/g, " ")
-        )
+        .map((k) => k.toLowerCase() + ":" + String(h[k]).trim().replace(/\s+/g, " "))
         .join("\n");
     }
     _signedHeaders() {
-      const h = this.r.headers,
-        IGN = {
-          authorization: 1,
-          connection: 1,
-          "x-amzn-trace-id": 1,
-          "user-agent": 1,
-          expect: 1,
-          "presigned-expires": 1,
-          range: 1,
-        };
+      const h = this.r.headers, IGN = {
+        authorization: 1, connection: 1, "x-amzn-trace-id": 1, "user-agent": 1,
+        expect: 1, "presigned-expires": 1, range: 1
+      };
       const INC = ["x-ebg-.*", "host"];
       return Object.keys(h)
         .map((k) => k.toLowerCase())
@@ -637,23 +554,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const q = this.r.query;
       if (!q || !Object.keys(q).length) return "";
       const parts = [];
-      Object.keys(q)
-        .sort()
-        .forEach((k) => {
-          const key = encRFC3986(k);
-          const vals = Array.isArray(q[k]) ? q[k] : [q[k]];
-          vals
-            .map(String)
-            .map(encRFC3986)
-            .sort()
-            .forEach((v) => parts.push(`${key}=${v}`));
-        });
+      Object.keys(q).sort().forEach((k) => {
+        const key = encRFC3986(k);
+        const vals = Array.isArray(q[k]) ? q[k] : [q[k]];
+        vals.map(String).map(encRFC3986).sort().forEach((v) => parts.push(`${key}=${v}`));
+      });
       return parts.join("&");
     }
     _canonPath() {
       let p = this.r.path || "/";
-      if (/[^0-9A-Za-z;,/?:@&=+$\-_.!~*'()#%]/.test(p))
-        p = encodeURI(decodeURI(p));
+      if (/[^0-9A-Za-z;,/?:@&=+$\-_.!~*'()#%]/.test(p)) p = encodeURI(decodeURI(p));
       const parts = p.split("/").reduce((acc, seg) => {
         if (!seg || seg === ".") return acc;
         if (seg === "..") acc.pop();
@@ -685,18 +595,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!h["x-ebg-param"]) h["x-ebg-param"] = this._ts();
       delete h["x-ebg-signature"];
       delete h["X-Ebg-Signature"];
-      const clientKeyCandidate =
-        typeof PB_ENV?.CLIENT_KEY === "string" ? PB_ENV.CLIENT_KEY.trim() : "";
+      const clientKeyCandidate = typeof PB_ENV?.CLIENT_KEY === "string" ? PB_ENV.CLIENT_KEY.trim() : "";
       const clientKey = clientKeyCandidate || "1234567";
-      if (
-        !clientKeyCandidate &&
-        PB_DEBUG &&
-        !PB_ENV.__warnedFallbackClientKey
-      ) {
+      if (!clientKeyCandidate && PB_DEBUG && !PB_ENV.__warnedFallbackClientKey) {
         PB_ENV.__warnedFallbackClientKey = true;
-        console.warn(
-          "[Signer] Using fallback client key; set data-client-key attributes for production values."
-        );
+        console.warn("[Signer] Using fallback client key; set data-client-key attributes for production values.");
       }
       h["x-ebg-signature"] = "v1:" + hexHmac(clientKey, this._stringToSign());
       if (PB_DEBUG) console.debug("[Signer] headers", h);
@@ -704,11 +607,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // reCAPTCHA (invisible)
-  let widgetId = null,
-    apiReady = null,
-    pendingResolve = null;
-  function loadRecaptcha() {
+  // reCAPTCHA
+  let widgetId = null, apiReady = null, pendingResolve = null;
+  const loadRecaptcha = () => {
     if (apiReady) return apiReady;
     apiReady = new Promise((resolve, reject) => {
       if (!document.getElementById("recaptcha-container")) {
@@ -717,8 +618,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const s = document.createElement("script");
-      s.src =
-        "https://www.google.com/recaptcha/api.js?render=explicit&onload=__pbRcOnLoad";
+      s.src = "https://www.google.com/recaptcha/api.js?render=explicit&onload=__pbRcOnLoad";
       s.async = s.defer = true;
       s.onerror = () => reject(new Error("Failed to load reCAPTCHA script"));
       document.head.appendChild(s);
@@ -734,8 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
               grecaptcha.reset(widgetId);
             },
           });
-          if (PB_DEBUG)
-            console.info("[reCAPTCHA] rendered, widgetId=", widgetId);
+          if (PB_DEBUG) console.info("[reCAPTCHA] rendered, widgetId=", widgetId);
           resolve();
         } catch (e) {
           console.error("[reCAPTCHA] render error", e);
@@ -744,42 +643,24 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     });
     return apiReady;
-  }
+  };
 
-  window.pbGetRecaptchaToken = () =>
-    loadRecaptcha().then(
-      () =>
-        new Promise((resolve, reject) => {
-          pendingResolve = resolve;
-          try {
-            if (PB_DEBUG) console.debug("[reCAPTCHA] executing");
-            grecaptcha.execute(widgetId);
-          } catch (e) {
-            pendingResolve = null;
-            console.error("[reCAPTCHA] execute error", e);
-            reject(e);
-          }
-        })
-    );
+  window.pbGetRecaptchaToken = () => loadRecaptcha().then(() => new Promise((resolve, reject) => {
+    pendingResolve = resolve;
+    try {
+      if (PB_DEBUG) console.debug("[reCAPTCHA] executing");
+      grecaptcha.execute(widgetId);
+    } catch (e) {
+      pendingResolve = null;
+      console.error("[reCAPTCHA] execute error", e);
+      reject(e);
+    }
+  }));
 
-  // direct upload (XHR)
-  window.pbDirectUpload = async function (
-    file,
-    requestId,
-    captchaCode,
-    orgId = null,
-    filenameOverride = true,
-    onProgress = () => {}
-  ) {
+  // Direct upload (XHR)
+  window.pbDirectUpload = async (file, requestId, captchaCode, orgId = null, filenameOverride = true, onProgress = () => {}) => {
     console.group("[pbDirectUpload]");
-    console.log(
-      "file:",
-      file?.name,
-      file?.type,
-      file?.size,
-      "requestId:",
-      requestId
-    );
+    console.log("file:", file?.name, file?.type, file?.size, "requestId:", requestId);
     const form = new FormData();
     form.append("file", file, file.name);
     form.append("filenameOverride", JSON.stringify(filenameOverride));
@@ -789,40 +670,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiUrl = buildUploadUrl(orgId);
     const { host, pathname, search } = new URL(apiUrl);
     const signed = new PB_RequestSigner({
-      host,
-      method: "POST",
-      path: pathname + search,
-      headers: {},
-      body: "",
+      host, method: "POST", path: pathname + search, headers: {}, body: ""
     }).sign();
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", apiUrl);
       xhr.withCredentials = true;
-      xhr.setRequestHeader(
-        "x-ebg-signature",
-        signed.headers["x-ebg-signature"]
-      );
+      xhr.setRequestHeader("x-ebg-signature", signed.headers["x-ebg-signature"]);
       xhr.setRequestHeader("x-ebg-param", btoa(signed.headers["x-ebg-param"]));
       if (captchaCode) xhr.setRequestHeader("captcha-code", captchaCode);
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const pct = (e.loaded / e.total) * 100;
-          if (PB_DEBUG)
-            console.debug("[upload] progress", pct.toFixed(1) + "%");
+          if (PB_DEBUG) console.debug("[upload] progress", pct.toFixed(1) + "%");
           onProgress(pct, requestId);
         }
       };
       xhr.onreadystatechange = () => {
-        if (PB_DEBUG)
-          console.debug(
-            "[upload] readyState",
-            xhr.readyState,
-            "status",
-            xhr.status
-          );
+        if (PB_DEBUG) console.debug("[upload] readyState", xhr.readyState, "status", xhr.status);
       };
       xhr.onload = () => {
         if (xhr.status === 200) {
@@ -838,11 +705,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } else {
           let msg = "";
-          try {
-            msg = JSON.parse(xhr.response);
-          } catch {
-            msg = xhr.statusText;
-          }
+          try { msg = JSON.parse(xhr.response); } catch { msg = xhr.statusText; }
           console.error("[upload] error", xhr.status, msg);
           console.groupEnd();
           reject({ status: xhr.status, message: msg });
@@ -858,49 +721,43 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
-  // redirect helper (image optional)
-  window.pbBuildStudioRedirect = function (toolRoute, imageUrl, prompt) {
+  // Redirect helper
+  window.pbBuildStudioRedirect = (toolRoute, imageUrl, prompt) => {
     const params = new URLSearchParams();
     if (imageUrl) params.set("imageUrl", imageUrl);
     if (prompt) params.set("transformationPrompt", prompt);
-    const redirectTo = params.toString()
-      ? `${toolRoute}?${params.toString()}`
-      : toolRoute;
-    const final = `${
-      PB_ENV.CONSOLE_BASE
-    }/choose-org?redirectTo=${encodeURIComponent(redirectTo)}`;
+    const redirectTo = params.toString() ? `${toolRoute}?${params.toString()}` : toolRoute;
+    const final = `${PB_ENV.CONSOLE_BASE}/choose-org?redirectTo=${encodeURIComponent(redirectTo)}`;
     if (PB_DEBUG) console.info("[redirect]", final);
     return final;
   };
 })();
 
+// ===== PROGRESS & ERROR INTEGRATION =====
 (() => {
-  if (
-    typeof window.pbGetRecaptchaToken !== "function" ||
-    typeof window.pbDirectUpload !== "function" ||
-    typeof window.pbBuildStudioRedirect !== "function"
-  ) {
-    console.error(
-      "[integration] Core upload functions missing. Ensure CryptoJS + Core Upload load BEFORE this script."
-    );
+  if (typeof window.pbGetRecaptchaToken !== "function" ||
+      typeof window.pbDirectUpload !== "function" ||
+      typeof window.pbBuildStudioRedirect !== "function") {
+    console.error("[integration] Core upload functions missing. Ensure CryptoJS + Core Upload load BEFORE this script.");
     return;
   }
 
   const PROGRESS_BLOCK = "[pb-indicator-block='upload-progress']";
   const PROGRESS_TEXT = "[pb-indicator='progress-text']";
-  const showProgress = () => {
+
+  window.showProgress = () => {
     const el = document.querySelector(PROGRESS_BLOCK);
     if (el) el.style.display = "flex";
   };
-  const hideProgress = () => {
+  window.hideProgress = () => {
     const el = document.querySelector(PROGRESS_BLOCK);
     if (el) el.style.display = "none";
   };
-  const setProgress = (p) => {
+  window.setProgress = (p) => {
     const t = document.querySelector(PROGRESS_TEXT);
     if (t) t.textContent = `${Math.round(p)}%`;
   };
-  const flashErrorInline = (msg) => {
+  window.flashErrorInline = (msg) => {
     console.error("[integration] ", msg);
     const box = document.getElementById("uploadError");
     const txt = document.getElementById("uploadErrorText");
@@ -910,6 +767,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  // aiSearchSubmit event handler (legacy support)
+  window.addEventListener("aiSearchSubmit", (e) => {
+    if (!e?.detail) {
+      console.warn("[aiSearchSubmit] missing detail");
+      return;
+    }
+    handleSubmit(e.detail);
+  });
+
   async function handleSubmit(detail) {
     console.group("[aiSearchSubmit]");
     console.log("detail:", detail);
@@ -918,6 +784,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const prompt = (detail.prompt || "").trim();
     const files = Array.isArray(detail.files) ? detail.files : [];
     const needs = !!detail.needsImage;
+    const externalUrl = detail.externalImageUrl;
 
     if (!prompt) {
       flashErrorInline("Please enter a prompt.");
@@ -925,16 +792,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Case 1: needs image but none provided
-    const externalUrl = detail.externalImageUrl;
-
     if (needs && files.length === 0 && !externalUrl) {
       flashErrorInline("This prompt needs an image. Please upload one.");
       console.groupEnd();
       return;
     }
 
-    // Case 2: external URL only
     if (externalUrl && files.length === 0) {
       const studioRoute = `/studio/${tool}`;
       const redirectURL = pbBuildStudioRedirect(studioRoute, externalUrl, prompt);
@@ -944,7 +807,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Case 3: have a file -> upload then redirect
     const file = files[0];
     if (!file) {
       flashErrorInline("No file selected.");
@@ -958,15 +820,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       console.log("[step] get reCAPTCHA token");
       const captcha = await pbGetRecaptchaToken();
-      if (!captcha) {
-        throw new Error("reCAPTCHA token missing");
-      }
+      if (!captcha) throw new Error("reCAPTCHA token missing");
       console.log("[ok] captcha");
 
       console.log("[step] upload file");
-      const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) =>
-        setProgress(pct)
-      );
+      const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) => setProgress(pct));
       if (!resp?.url) throw new Error("Upload succeeded but no URL returned");
       console.log("[ok] upload ->", resp.url);
 
@@ -982,12 +840,4 @@ document.addEventListener("DOMContentLoaded", () => {
       console.groupEnd();
     }
   }
-
-  window.addEventListener("aiSearchSubmit", (e) => {
-    if (!e?.detail) {
-      console.warn("[aiSearchSubmit] missing detail");
-      return;
-    }
-    handleSubmit(e.detail);
-  });
 })();

@@ -236,13 +236,29 @@ function initCarousel() {
   sliderTrack.innerHTML = '';
   slideElements = [];
 
-  // Preconnect to CDN for faster image loading
+  // Preconnect + DNS prefetch for fastest image loading
   if (!document.querySelector('link[rel="preconnect"][href*="pixelbin.io"]')) {
     const preconnect = document.createElement('link');
     preconnect.rel = 'preconnect';
     preconnect.href = 'https://cdn.pixelbin.io';
     preconnect.crossOrigin = 'anonymous';
     document.head.appendChild(preconnect);
+
+    const dnsPrefetch = document.createElement('link');
+    dnsPrefetch.rel = 'dns-prefetch';
+    dnsPrefetch.href = 'https://cdn.pixelbin.io';
+    document.head.appendChild(dnsPrefetch);
+  }
+
+  // Preload LCP image for fastest First Contentful Paint
+  const centerSlide = slides[0];
+  if (centerSlide && !document.querySelector(`link[rel="preload"][href*="${centerSlide.images[0].split('?')[0]}"]`)) {
+    const preload = document.createElement('link');
+    preload.rel = 'preload';
+    preload.as = 'image';
+    preload.href = variant(centerSlide.images[0], 450, 300);
+    preload.fetchPriority = 'high';
+    document.head.appendChild(preload);
   }
 
   slides.forEach((slide, idx) => {
@@ -269,29 +285,18 @@ function initCarousel() {
     if (slideImage) {
       slideImage.dataset.srcBase = slide.images[0];
 
-      // Load all images at 600x400 for consistent quality without flicker
+      // Aggressive lazy loading - only load center image immediately
       if (dist0 < 0.5) {
-        // Center image: highest priority, eager load
+        // Center image ONLY: immediate load at lower resolution for speed
         slideImage.loading = 'eager';
         slideImage.fetchPriority = 'high';
-        slideImage.src = variant(slideImage.dataset.srcBase, 600, 400);
+        slideImage.src = variant(slideImage.dataset.srcBase, 450, 300);
         slideImage.decode().catch(() => {});
-      } else if (dist0 < 1.5) {
-        // Adjacent images: high priority, eager load
-        slideImage.loading = 'eager';
-        slideImage.fetchPriority = 'high';
-        slideImage.src = variant(slideImage.dataset.srcBase, 600, 400);
-        requestIdleCallback(() => slideImage.decode().catch(() => {}));
-      } else if (dist0 < 2.5) {
-        // Near images: lazy load
-        slideImage.loading = 'lazy';
-        slideImage.fetchPriority = 'low';
-        slideImage.src = variant(slideImage.dataset.srcBase, 600, 400);
       } else {
-        // Far images: defer loading with placeholder until needed
+        // ALL other images: defer with placeholder, load on-demand
         slideImage.loading = 'lazy';
         slideImage.fetchPriority = 'low';
-        slideImage.dataset.lazySrc = variant(slideImage.dataset.srcBase, 600, 400);
+        slideImage.dataset.lazySrc = variant(slideImage.dataset.srcBase, 450, 300);
         slideImage.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
       }
     }
@@ -318,6 +323,11 @@ function updatePositions_now() {
     wrapper.style.visibility = isVisible ? 'visible' : 'hidden';
     wrapper.style.zIndex = String(1000 - Math.round(ad * 10));
 
+    // Use content-visibility for far slides to reduce rendering cost (CLS/TBT optimization)
+    wrapper.style.contentVisibility = ad > 2 ? 'auto' : 'visible';
+    // Optimize compositing for center and adjacent slides
+    wrapper.style.willChange = ad < 1.5 ? 'transform, width, height' : '';
+
     if (isMobile) {
       wrapper.style.bottom = '';
       wrapper.style.top = '50%';
@@ -335,7 +345,8 @@ function updatePositions_now() {
         : (dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW);
       slideCard.style.borderRadius = '24px';
       slideCard.style.boxShadow = shadowStyle;
-      slideCard.style.willChange = ad < 1.5 ? 'transform' : '';
+      // Optimize GPU acceleration - only hint will-change for actively animating slides
+      slideCard.style.willChange = ad < 1.5 ? 'transform, opacity' : '';
       slideCard.style.transformOrigin = isMobile ? '50% 50%' : '50% 100%';
       slideCard.style.transform = `scale(${(zoomActive() && ad < 0.5) ? FOCUS_SCALE : 1})`;
     }
@@ -344,11 +355,29 @@ function updatePositions_now() {
       slideImage.style.borderRadius = '24px';
       slideImage.style.objectPosition = (zoomActive() && ad < 0.5) ? '50% 45%' : '50% 50%';
 
-      // Dynamic lazy loading: load images when they come into view
-      if (ad < 2.5 && slideImage.dataset.lazySrc && slideImage.src.startsWith('data:')) {
-        slideImage.src = slideImage.dataset.lazySrc;
-        delete slideImage.dataset.lazySrc;
-        slideImage.loading = 'lazy';
+      // Progressive loading: load images as they approach viewport
+      if (slideImage.dataset.lazySrc && slideImage.src.startsWith('data:')) {
+        if (ad < 0.5) {
+          // Center: load immediately at high priority
+          slideImage.fetchPriority = 'high';
+          slideImage.loading = 'eager';
+          slideImage.src = slideImage.dataset.lazySrc;
+          delete slideImage.dataset.lazySrc;
+          slideImage.decode().catch(() => {});
+        } else if (ad < 1.5) {
+          // Adjacent: load with medium priority
+          slideImage.fetchPriority = 'high';
+          slideImage.loading = 'eager';
+          slideImage.src = slideImage.dataset.lazySrc;
+          delete slideImage.dataset.lazySrc;
+        } else if (ad < 3) {
+          // Nearby: lazy load
+          slideImage.loading = 'lazy';
+          slideImage.fetchPriority = 'low';
+          slideImage.src = slideImage.dataset.lazySrc;
+          delete slideImage.dataset.lazySrc;
+        }
+        // Beyond 3 slides: keep placeholder, load when closer
       }
     }
   });
@@ -816,12 +845,12 @@ function setupEventHandlers() {
     if (e.key === 'Escape' && q('searchForm')?.classList.contains('multi-line')) collapseHandler();
   });
 
-  // Wheel scroll
+  // Wheel scroll - optimized for INP
   const wheelSurface = q('slider-track');
   if (wheelSurface) {
     let wheelV = 0, wheelRAF = null, wheelAnimating = false, lastWheelTime = 0;
     const WHEEL_SENSITIVITY = 0.008, WHEEL_FRICTION = 0.88, WHEEL_MIN_V = 0.005, WHEEL_TIMEOUT = 150, SNAP_THRESHOLD = 0.15;
-    let wheelTimeout = null;
+    let wheelTimeout = null, wheelDebounceTimer = null;
 
     wheelSurface.addEventListener('wheel', (e) => {
       const absX = Math.abs(e.deltaX), absY = Math.abs(e.deltaY);
@@ -830,7 +859,13 @@ function setupEventHandlers() {
       if (!horizontalIntent && !useShiftAsHorizontal) return;
 
       e.preventDefault();
-      setUserActive(true);
+
+      // Debounce non-critical updates for better INP
+      if (wheelDebounceTimer) clearTimeout(wheelDebounceTimer);
+      wheelDebounceTimer = setTimeout(() => {
+        setUserActive(true);
+      }, 16);
+
       lastWheelTime = performance.now();
 
       if (wheelTimeout) { clearTimeout(wheelTimeout); wheelTimeout = null; }
@@ -946,7 +981,30 @@ window.aiPhotoCarousel = {
       startRotation();
     }
   },
-  getStoredPrompt: () => storedPrompt
+  getStoredPrompt: () => storedPrompt,
+  clearStoredPrompt() {
+    // Clear stored prompt when carousel image is removed
+    storedPrompt = '';
+    isPromptExpanded = false;
+  },
+  markUserInControl() {
+    // Mark that user has taken control and carousel should not interfere
+    userHasTakenControl = true;
+    setUserActive(true);
+    pauseRotation();
+  },
+  resetAfterCarouselImageRemoval() {
+    // Reset carousel state when carousel image is removed
+    // DON'T reset lastInjectedSlideId - prevents re-injection of same image on refocus
+    // User must change slides or manually scroll to get a new injection
+    userHasTakenControl = false;
+    isPromptExpanded = false;
+    storedPrompt = '';
+    injectionInProgress = false;
+    isFocusZoomed = false;
+    setUserActive(false);
+    requestUpdate();
+  }
 };
 
 if (document.readyState === 'loading') {

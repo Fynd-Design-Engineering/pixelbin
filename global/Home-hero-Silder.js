@@ -715,7 +715,11 @@ function handleUserInput(value) {
 }
 
 function switchToMultiline() {
-  // Pause auto-rotation and enter “zoomed” focus on desktop
+  // 🔖 VERSION: v1.2-delayed-prompt (CURRENT)
+  // Prompt expands immediately with animation (no blank space)
+  // Previous: v1.1-nested-raf-consistent (had timing issues with prompt)
+
+  // Pause auto-rotation and enter "zoomed" focus on desktop
   setUserActive(true);
   pauseRotation();
   isFocusZoomed = !isMobile;
@@ -732,30 +736,100 @@ function switchToMultiline() {
     container: q('searchContainer'),
   };
 
-  els.searchForm?.classList.remove('single-line');
-  els.searchForm?.classList.add('multi-line');
-  els.formContent?.classList.remove('single-line');
-  els.toolbar?.classList.remove('single-line');
-  els.container?.classList.remove('single-line');
-  els.container?.classList.add('multi-line');
-
-  if (els.textInput && els.textArea) {
-    els.textArea.value = els.textInput.value;
-    els.textInput.classList.add('hidden');
-    els.textArea.classList.remove('hidden');
-
-    // Focus the textarea and place caret at end (works across browsers)
-    requestAnimationFrame(() => {
-      els.textArea.focus({ preventScroll: true });
-      const end = els.textArea.value.length;
-      try { els.textArea.setSelectionRange(end, end); } catch {}
-      // Re-enable blur handling after the swap settles
-      setTimeout(() => { suppressNextBlur = false; }, 120);
-    });
-  } else {
-    // If we can't swap inputs, re-enable blur handling anyway
-    setTimeout(() => { suppressNextBlur = false; }, 0);
+  // Capture current dimensions before transition
+  if (els.container) {
+    const rect = els.container.getBoundingClientRect();
+    els.container.style.height = rect.height + 'px';
+    els.container.style.minHeight = rect.height + 'px';
   }
+  if (els.searchForm) {
+    const rect = els.searchForm.getBoundingClientRect();
+    els.searchForm.style.height = rect.height + 'px';
+    els.searchForm.style.minHeight = rect.height + 'px';
+  }
+
+  // Add expanding animation class for smooth transition
+  els.searchForm?.classList.add('expanding');
+  els.container?.classList.add('expanding');
+
+  // Force a reflow to ensure the heights are set before transition
+  if (els.container) els.container.offsetHeight;
+  if (els.searchForm) els.searchForm.offsetHeight;
+
+  // Apply transition styles for smooth expansion
+  if (els.searchForm) {
+    els.searchForm.style.transition = 'height 400ms cubic-bezier(0.4, 0, 0.2, 1), min-height 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 400ms ease';
+  }
+  if (els.container) {
+    els.container.style.transition = 'height 400ms cubic-bezier(0.4, 0, 0.2, 1), min-height 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 400ms ease';
+  }
+  if (els.formContent) {
+    els.formContent.style.transition = 'opacity 400ms ease';
+  }
+
+  // Use requestAnimationFrame to ensure smooth transition
+  requestAnimationFrame(() => {
+    els.searchForm?.classList.remove('single-line');
+    els.searchForm?.classList.add('multi-line');
+    els.formContent?.classList.remove('single-line');
+    els.toolbar?.classList.remove('single-line');
+    els.container?.classList.remove('multi-line');
+    els.container?.classList.add('multi-line');
+
+    if (els.textInput && els.textArea) {
+      els.textArea.value = els.textInput.value;
+      els.textInput.classList.add('hidden');
+      els.textArea.classList.remove('hidden');
+    }
+
+    // Expand prompt immediately when starting animation (so it grows with container)
+    if (storedPrompt && window.searchFeature && !userHasTakenControl) {
+      window.searchFeature.setPrompt(storedPrompt);
+      isPromptExpanded = true;
+    }
+
+    // Reset height constraints to allow natural sizing with transition
+    requestAnimationFrame(() => {
+      if (els.container) {
+        els.container.style.height = '';
+        els.container.style.minHeight = '';
+      }
+      if (els.searchForm) {
+        els.searchForm.style.height = '';
+        els.searchForm.style.minHeight = '';
+      }
+
+      // Focus the textarea and place caret at end (works across browsers)
+      if (els.textArea) {
+        els.textArea.focus({ preventScroll: true });
+        const end = els.textArea.value.length;
+        try { els.textArea.setSelectionRange(end, end); } catch {}
+      }
+    });
+  });
+
+  // Remove expanding class and clean up after animation completes
+  setTimeout(() => {
+    els.searchForm?.classList.remove('expanding');
+    els.container?.classList.remove('expanding');
+
+    // Clean up inline styles
+    if (els.container) {
+      els.container.style.transition = '';
+      els.container.style.height = '';
+      els.container.style.minHeight = '';
+    }
+    if (els.searchForm) {
+      els.searchForm.style.transition = '';
+      els.searchForm.style.height = '';
+      els.searchForm.style.minHeight = '';
+    }
+    if (els.formContent) {
+      els.formContent.style.transition = '';
+    }
+
+    suppressNextBlur = false;
+  }, 450);
 
   isSingleLineMode = false;
   requestUpdate();
@@ -763,6 +837,10 @@ function switchToMultiline() {
 
 
 function switchToSingleLine() {
+  // 🔖 VERSION: v1.2-delayed-prompt (CURRENT)
+  // Prompt truncates AFTER animation completes (no blank space)
+  // Previous: v1.1-nested-raf-consistent (had timing issues with prompt)
+
   // Exit zoom, allow rotation to resume after we leave multiline
   isFocusZoomed = false;
 
@@ -775,18 +853,85 @@ function switchToSingleLine() {
     container: q('searchContainer'),
   };
 
-  els.searchForm?.classList.remove('multi-line');
-  els.searchForm?.classList.add('single-line');
-  els.formContent?.classList.add('single-line');
-  els.toolbar?.classList.add('single-line');
-  els.container?.classList.remove('multi-line');
-  els.container?.classList.add('single-line');
-
-  if (els.textInput && els.textArea) {
-    els.textInput.value = els.textArea.value || '';
-    els.textArea.classList.add('hidden');
-    els.textInput.classList.remove('hidden');
+  // Capture current dimensions and position before transition
+  if (els.container) {
+    const rect = els.container.getBoundingClientRect();
+    els.container.style.height = rect.height + 'px';
+    els.container.style.minHeight = rect.height + 'px';
   }
+  if (els.searchForm) {
+    const rect = els.searchForm.getBoundingClientRect();
+    els.searchForm.style.height = rect.height + 'px';
+    els.searchForm.style.minHeight = rect.height + 'px';
+  }
+
+  // Add collapsing animation class for smooth transition
+  els.searchForm?.classList.add('collapsing');
+  els.container?.classList.add('collapsing');
+
+  // Force a reflow to ensure the heights are set before transition
+  if (els.container) els.container.offsetHeight;
+  if (els.searchForm) els.searchForm.offsetHeight;
+
+  // Apply transition styles for smooth collapse
+  if (els.searchForm) {
+    els.searchForm.style.transition = 'height 400ms cubic-bezier(0.4, 0, 0.2, 1), min-height 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 400ms ease';
+  }
+  if (els.container) {
+    els.container.style.transition = 'height 400ms cubic-bezier(0.4, 0, 0.2, 1), min-height 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 400ms ease';
+  }
+  if (els.formContent) {
+    els.formContent.style.transition = 'opacity 400ms ease';
+  }
+
+  // Use requestAnimationFrame to ensure transition happens
+  requestAnimationFrame(() => {
+    els.searchForm?.classList.remove('multi-line');
+    els.searchForm?.classList.add('single-line');
+    els.formContent?.classList.add('single-line');
+    els.toolbar?.classList.add('single-line');
+    els.container?.classList.remove('multi-line');
+    els.container?.classList.add('single-line');
+
+    if (els.textInput && els.textArea) {
+      els.textInput.value = els.textArea.value || '';
+      els.textArea.classList.add('hidden');
+      els.textInput.classList.remove('hidden');
+    }
+
+    // Reset height constraints to allow natural sizing with transition
+    requestAnimationFrame(() => {
+      if (els.container) {
+        els.container.style.height = '';
+        els.container.style.minHeight = '';
+      }
+      if (els.searchForm) {
+        els.searchForm.style.height = '';
+        els.searchForm.style.minHeight = '';
+      }
+    });
+  });
+
+  // Remove collapsing class and clean up after animation completes
+  setTimeout(() => {
+    els.searchForm?.classList.remove('collapsing');
+    els.container?.classList.remove('collapsing');
+
+    // Clean up inline styles
+    if (els.container) {
+      els.container.style.transition = '';
+      els.container.style.height = '';
+      els.container.style.minHeight = '';
+    }
+    if (els.searchForm) {
+      els.searchForm.style.transition = '';
+      els.searchForm.style.height = '';
+      els.searchForm.style.minHeight = '';
+    }
+    if (els.formContent) {
+      els.formContent.style.transition = '';
+    }
+  }, 450);
 
   if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
   window.searchFeature?.clearImages('all');
@@ -798,13 +943,16 @@ function switchToSingleLine() {
   userHasTakenControl = false;
   isPromptExpanded = false;
 
-  if (storedPrompt && window.searchFeature) {
-    window.searchFeature.setPrompt(truncateText(storedPrompt));
-  }
+  // Delay prompt truncation until AFTER animation completes (400ms animation + 50ms buffer)
+  setTimeout(() => {
+    if (storedPrompt && window.searchFeature) {
+      window.searchFeature.setPrompt(truncateText(storedPrompt));
+    }
+  }, 450);
 
   isSingleLineMode = true;
   setUserActive(false);
- requestUpdate();
+  requestUpdate();
 }
 
 

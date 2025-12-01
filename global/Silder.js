@@ -54,6 +54,7 @@ const LITE_SHADOW = '0 1px 2px rgba(0,0,0,0.08)';
 // Simple gap system - just one value to control spacing
 const GAP_NORMAL = 12;      // Gap when not zoomed (user uploaded image)
 const GAP_ZOOMED = 12;      // Gap when zoomed (default state)
+const GAP_MOBILE = 100;     // Gap for mobile devices - increased to prevent overlap
 
 // ===== MODES =====
 let isSnapping = false, currentMode = 'auto', lastMode = null;
@@ -165,19 +166,22 @@ function getSignedDistance(absoluteIndex, offset = currentOffset) {
 
 function getAxisSizes() {
   if (!isMobile) {
-    // Desktop: Zoomed uses larger center image
+    // Zoomed: use actual rendered widths for correct positioning
     if (zoomActive()) {
       return { center: 748, adjacent: 328, far: 328 };
     }
-    // Desktop: Not zoomed uses uniform sizes
+    // Not zoomed: normal sizes
     return { center: 328, adjacent: 328, far: 328 };
   }
-  // Mobile: Original sizes for proper mobile layout (vertical stack)
-  return { center: 420, adjacent: 340, far: 260 };
+  // Mobile sizes
+  return { center: 328, adjacent: 328, far: 328 };
 }
 
-// Simplified - just get the gap based on zoom state
-const getCurrentGap = () => zoomActive() ? GAP_ZOOMED : GAP_NORMAL;
+// Simplified - just get the gap based on zoom state and device
+const getCurrentGap = () => {
+  if (isMobile) return GAP_MOBILE;
+  return zoomActive() ? GAP_ZOOMED : GAP_NORMAL;
+};
 
 const NOMINAL_STEP = () => {
   const { center, adjacent } = getAxisSizes();
@@ -206,21 +210,18 @@ function getCardPosition(absoluteIndex, offset = currentOffset) {
 
 function getDimsFromDistance(ad) {
   if (ad < 0.5) {
-    // Center image
     if (zoomActive()) return { width: 748, height: 437, opacity: 1, yOffset: 0, shadow: true };
     return isMobile
-      ? { width: 300, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Mobile center
-      : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };  // Desktop center
+      ? { width: 328, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Reduced from 360x451 to fit 320px screens
+      : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };
   } else if (ad < 1.5) {
-    // Adjacent images (±1)
     return isMobile
-      ? { width: 240, height: 300, opacity: 0.4, yOffset: 0, shadow: false }  // Mobile adjacent
-      : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };  // Desktop adjacent
+      ? { width: 328, height: 437, opacity: 0.3, yOffset: 0, shadow: false }  // Adjacent images at -1 and +1 position
+      : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };
   }
-  // Far images (±2, ±3, etc.)
   return isMobile
-    ? { width: 240, height: 300, opacity: 0.15, yOffset: 0, shadow: false }  // Mobile far
-    : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };  // Desktop far
+    ? { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
+    : { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false };  // Reduced opacity from 0.2 to 0.15 for better text visibility
 }
 
 // ===== DOM BUILD =====
@@ -901,7 +902,7 @@ window.aiPhotoCarousel = {
       lastInjectedSlideId = null;
       injectionInProgress = false;
     }
-    scheduleSyncBackend();
+    if (!isSingleLineMode) scheduleSyncBackend();
   },
   setUserActive,
   setInjectUrlForSlide(id, url) {

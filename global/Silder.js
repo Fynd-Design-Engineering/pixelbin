@@ -46,10 +46,14 @@ let typewriterInterval = null, typewriterIndex = 0, typewriterTargetPrompt = '';
 
 // ===== CONSTANTS =====
 const ROTATION_DELAY = 5000, SNAP_DURATION = 300, AUTO_TRANSFORM_MS = 700;
-const FOCUS_SCALE = 1, FOCUS_SPREAD = 4, FOCUS_TRANSITION_MS = 750;
+const FOCUS_SCALE = 1, FOCUS_TRANSITION_MS = 750;
 const CENTER_SHADOW = '1px 18px 10px #8543ff08, 1px 3px 4px #630fff0a';
 const SOFT_SHADOW = '3px 6px 7px #630fff08, 1px 2px 4px #630fff0a';
 const LITE_SHADOW = '0 1px 2px rgba(0,0,0,0.08)';
+
+// Simple gap system - just one value to control spacing
+const GAP_NORMAL = 12;      // Gap when not zoomed (user uploaded image)
+const GAP_ZOOMED = 12;      // Gap when zoomed (default state)
 
 // ===== MODES =====
 let isSnapping = false, currentMode = 'auto', lastMode = null;
@@ -161,16 +165,23 @@ function getSignedDistance(absoluteIndex, offset = currentOffset) {
 
 function getAxisSizes() {
   if (!isMobile) {
-    const centerBase = zoomActive() ? 480 : 335;
-    const center = zoomActive() ? centerBase * FOCUS_SCALE : centerBase;
-    return { center, adjacent: 272, far: 208 };
+    // Zoomed: use actual rendered widths for correct positioning
+    if (zoomActive()) {
+      return { center: 748, adjacent: 328, far: 328 };
+    }
+    // Not zoomed: normal sizes
+    return { center: 328, adjacent: 328, far: 328 };
   }
-  return { center: 420, adjacent: 340, far: 260 };
+  // Mobile sizes
+  return { center: 328, adjacent: 328, far: 328 };
 }
+
+// Simplified - just get the gap based on zoom state
+const getCurrentGap = () => zoomActive() ? GAP_ZOOMED : GAP_NORMAL;
 
 const NOMINAL_STEP = () => {
   const { center, adjacent } = getAxisSizes();
-  return center/2 + 45 * (zoomActive() ? FOCUS_SPREAD : 1) + adjacent/2;
+  return center/2 + getCurrentGap() + adjacent/2;
 };
 
 const pxToOffset = (deltaPx) => -deltaPx / NOMINAL_STEP();
@@ -180,13 +191,13 @@ function getCardPosition(absoluteIndex, offset = currentOffset) {
   const ad = Math.abs(d);
   const sgn = d >= 0 ? 1 : -1;
   const { center, adjacent, far } = getAxisSizes();
-  const baseGap = 45 * (zoomActive() ? FOCUS_SPREAD : 1);
+  const gap = getCurrentGap(); // Simple - just one gap value
 
   const posAt = (n) => {
     if (n === 0) return 0;
-    if (n === 1) return sgn * (center/2 + baseGap + adjacent/2);
-    if (n === 2) return sgn * (center/2 + baseGap + adjacent + baseGap + far/2);
-    return sgn * (center/2 + baseGap + adjacent + baseGap + far/2 + (n - 2) * (far + baseGap));
+    if (n === 1) return sgn * (center/2 + gap + adjacent/2);
+    if (n === 2) return sgn * (center/2 + gap + adjacent + gap + far/2);
+    return sgn * (center/2 + gap + adjacent + gap + far/2 + (n - 2) * (far + gap));
   };
 
   const n0 = Math.floor(ad), n1 = Math.ceil(ad), t = ad - n0;
@@ -197,16 +208,16 @@ function getDimsFromDistance(ad) {
   if (ad < 0.5) {
     if (zoomActive()) return { width: 748, height: 437, opacity: 1, yOffset: 0, shadow: true };
     return isMobile
-      ? { width: 300, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Reduced from 360x451 to fit 320px screens
+      ? { width: 328, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Reduced from 360x451 to fit 320px screens
       : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };
   } else if (ad < 1.5) {
     return isMobile
-      ? { width: 240, height: 437, opacity: 0.4, yOffset: 0, shadow: false }  // Reduced opacity from 0.7 to 0.4 for better text visibility
-      : { width: 272, height: 437, opacity: 0.4, yOffset: 0, shadow: false };  // Reduced opacity from 0.7 to 0.4 for better text visibility
+      ? { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false }  // Reduced opacity from 0.7 to 0.4 for better text visibility
+      : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };  // Reduced opacity from 0.7 to 0.4 for better text visibility
   }
   return isMobile
-    ? { width: 240, height: 437, opacity: 0.15, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
-    : { width: 208, height: 437, opacity: 0.15, yOffset: 0, shadow: false };  // Reduced opacity from 0.2 to 0.15 for better text visibility
+    ? { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
+    : { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false };  // Reduced opacity from 0.2 to 0.15 for better text visibility
 }
 
 // ===== DOM BUILD =====
@@ -252,16 +263,7 @@ function initCarousel() {
     document.head.appendChild(dnsPrefetch);
   }
 
-  // Preload LCP image for fastest First Contentful Paint
-  const centerSlide = slides[0];
-  if (centerSlide && !document.querySelector(`link[rel="preload"][href*="${centerSlide.images[0].split('?')[0]}"]`)) {
-    const preload = document.createElement('link');
-    preload.rel = 'preload';
-    preload.as = 'image';
-    preload.href = variant(centerSlide.images[0], 450, 300);
-    preload.fetchPriority = 'high';
-    document.head.appendChild(preload);
-  }
+  // Preloading is handled in init() - no need to duplicate here
 
   slides.forEach((slide, idx) => {
     const dist0 = Math.abs(getSignedDistance(idx, 0));
@@ -649,7 +651,14 @@ function endDesktopDrag() {
   if (track) track.style.cursor = 'grab';
   document.body.style.userSelect = '';
   smoothSnapTo(Math.round(currentOffset));
-  setTimeout(() => setUserActive(false), 300);
+  setTimeout(() => {
+    setUserActive(false);
+    // Re-enable zoom after dragging stops (if user hasn't taken control)
+    if (!userHasTakenControl) {
+      isFocusZoomed = !isMobile;
+      requestUpdate();
+    }
+  }, 300);
 }
 
 // ===== EVENTS =====
@@ -805,7 +814,14 @@ function setupEventHandlers() {
             const nearest = Math.round(currentOffset);
             if (Math.abs(currentOffset - nearest) < SNAP_THRESHOLD || performance.now() - lastWheelTime > WHEEL_TIMEOUT) {
               smoothSnapTo(nearest);
-              setTimeout(() => setUserActive(false), 300);
+              setTimeout(() => {
+                setUserActive(false);
+                // Re-enable zoom after small scroll completes
+                if (!userHasTakenControl) {
+                  isFocusZoomed = !isMobile;
+                  requestUpdate();
+                }
+              }, 300);
               return;
             }
           }
@@ -821,9 +837,11 @@ function setupEventHandlers() {
           smoothSnapTo(Math.round(currentOffset));
           setTimeout(() => {
             setUserActive(false);
-            // Re-enable zoom after scrolling stops
-            isFocusZoomed = !isMobile && !userHasTakenControl;
-            requestUpdate();
+            // Re-enable zoom after scrolling stops (if user hasn't taken control)
+            if (!userHasTakenControl) {
+              isFocusZoomed = !isMobile;
+              requestUpdate();
+            }
           }, 300);
         }
       }, WHEEL_TIMEOUT);

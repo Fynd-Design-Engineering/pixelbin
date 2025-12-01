@@ -165,15 +165,15 @@ function getSignedDistance(absoluteIndex, offset = currentOffset) {
 
 function getAxisSizes() {
   if (!isMobile) {
-    // Zoomed: use actual rendered widths for correct positioning
+    // Desktop: Zoomed uses larger center image
     if (zoomActive()) {
       return { center: 748, adjacent: 328, far: 328 };
     }
-    // Not zoomed: normal sizes
+    // Desktop: Not zoomed uses uniform sizes
     return { center: 328, adjacent: 328, far: 328 };
   }
-  // Mobile sizes
-  return { center: 328, adjacent: 328, far: 328 };
+  // Mobile: Original sizes for proper mobile layout (vertical stack)
+  return { center: 420, adjacent: 340, far: 260 };
 }
 
 // Simplified - just get the gap based on zoom state
@@ -206,18 +206,21 @@ function getCardPosition(absoluteIndex, offset = currentOffset) {
 
 function getDimsFromDistance(ad) {
   if (ad < 0.5) {
+    // Center image
     if (zoomActive()) return { width: 748, height: 437, opacity: 1, yOffset: 0, shadow: true };
     return isMobile
-      ? { width: 328, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Reduced from 360x451 to fit 320px screens
-      : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };
+      ? { width: 300, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Mobile center
+      : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };  // Desktop center
   } else if (ad < 1.5) {
+    // Adjacent images (±1)
     return isMobile
-      ? { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false }  // Reduced opacity from 0.7 to 0.4 for better text visibility
-      : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };  // Reduced opacity from 0.7 to 0.4 for better text visibility
+      ? { width: 240, height: 300, opacity: 0.4, yOffset: 0, shadow: false }  // Mobile adjacent
+      : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };  // Desktop adjacent
   }
+  // Far images (±2, ±3, etc.)
   return isMobile
-    ? { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
-    : { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false };  // Reduced opacity from 0.2 to 0.15 for better text visibility
+    ? { width: 240, height: 300, opacity: 0.15, yOffset: 0, shadow: false }  // Mobile far
+    : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };  // Desktop far
 }
 
 // ===== DOM BUILD =====
@@ -898,7 +901,7 @@ window.aiPhotoCarousel = {
       lastInjectedSlideId = null;
       injectionInProgress = false;
     }
-    if (!isSingleLineMode) scheduleSyncBackend();
+    scheduleSyncBackend();
   },
   setUserActive,
   setInjectUrlForSlide(id, url) {

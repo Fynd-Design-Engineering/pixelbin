@@ -45,7 +45,7 @@ let isFocusZoomed = true, __frameScheduled = false; // Always zoomed by default 
 let typewriterInterval = null, typewriterIndex = 0, typewriterTargetPrompt = '';
 
 // ===== CONSTANTS =====
-const ROTATION_DELAY = 5000, SNAP_DURATION = 300, AUTO_TRANSFORM_MS = 700;
+const ROTATION_DELAY = 5000, SNAP_DURATION = 100, AUTO_TRANSFORM_MS = 700;
 const FOCUS_SCALE = 1, FOCUS_TRANSITION_MS = 750;
 const CENTER_SHADOW = '1px 18px 10px #8543ff08, 1px 3px 4px #630fff0a';
 const SOFT_SHADOW = '3px 6px 7px #630fff08, 1px 2px 4px #630fff0a';

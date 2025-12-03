@@ -155,10 +155,30 @@ document.addEventListener("DOMContentLoaded", () => {
     if (hasUserImage && state.images.length >= MAX_IMAGES) hideImageHint();
   };
 
+  // Track rendered images to prevent unnecessary re-renders
+  let lastRenderedUrls = [];
+  let lastRenderedCount = 0;
+
   // Render thumbnails
   const renderImages = () => {
     if (!imagesSection) return;
+
+    // Check if images actually changed
+    const currentUrls = state.images.map(img => img.url);
+    const currentCount = state.images.length;
+
+    // Always re-render if count changed (even if URLs are the same)
+    // This handles clear + re-inject scenarios
+    const hasChanged = currentCount !== lastRenderedCount ||
+                       currentUrls.some((url, idx) => url !== lastRenderedUrls[idx]);
+
+    // Skip re-render if nothing changed
+    if (!hasChanged) return;
+
+    lastRenderedUrls = [...currentUrls];
+    lastRenderedCount = currentCount;
     imagesSection.innerHTML = "";
+
     state.images.forEach((img, idx) => {
       const div = document.createElement("div");
       div.className = "image-thumbnail";
@@ -172,7 +192,9 @@ document.addEventListener("DOMContentLoaded", () => {
         minWidth: "72px",
         minHeight: "72px",
         flexShrink: "0",    // Prevent shrinking
-        position: "relative"
+        position: "relative",
+        opacity: "0",       // Start invisible for fade-in effect
+        transition: "opacity 250ms ease-out"  // Fast, smooth fade-in
       });
       if (img.source) div.dataset.source = img.source;
       if (img.slideKey) div.dataset.slideKey = img.slideKey;
@@ -237,6 +259,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       div.appendChild(close);
       imagesSection.appendChild(div);
+
+      // Trigger fade-in animation - use double RAF for safety
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Only fade in if element is still in DOM
+          if (div.parentElement) {
+            div.style.opacity = "1";
+          }
+        });
+      });
     });
   };
 
@@ -262,9 +294,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Don't disable button during typewriter animation - only when user has control
     const promptPresent = state.inputValue.trim().length > 0;
     const overLimit = state.inputValue.length > state.maxChars;
-    const canGenerate = promptPresent && !overLimit && !state.isGenerating;
+    const canGenerate = (state.isTypewriterActive || promptPresent) && !overLimit && !state.isGenerating;
 
     generateButton?.classList.toggle("active", canGenerate);
     generateButton?.classList.toggle("inactive", !canGenerate);
@@ -312,7 +345,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // Only textArea is used now
-  textArea?.addEventListener("input", (e) => { state.inputValue = e.target.value; updateState(); });
+  textArea?.addEventListener("input", (e) => {
+    // Stop typewriter immediately when user starts typing
+    if (state.isTypewriterActive) {
+      window.searchFeature?.setTypewriterActive?.(false);
+    }
+    state.inputValue = e.target.value;
+    updateState();
+  });
   textArea?.addEventListener("focus", handleFocus);
   textArea?.addEventListener("blur", handleBlur);
 
@@ -326,6 +366,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Allow textarea to scroll its content, and allow page scroll when at boundaries
+  // The textarea naturally handles its own scrolling, no need to prevent anything
+
   // Add button
   addButton?.addEventListener("click", () => {
     // Check if we have user images at max limit (carousel images can be replaced)
@@ -335,6 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     fileInput?.click();
+    // NOTE: Typewriter will be stopped in markUserUpload() when file is selected
   });
   addButton?.addEventListener("mouseenter", () => { addButton.classList.add("active"); if (!HINT_ON_SUBMIT_ONLY) tooltip?.classList.add("show"); });
   addButton?.addEventListener("mouseleave", () => { addButton.classList.remove("active"); tooltip?.classList.remove("show"); });
@@ -355,14 +399,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const selected = incoming.slice(0, remaining);
     const ignored = incoming.length - selected.length;
 
+    // Mark user has uploaded image FIRST - before any state changes
+    // This stops typewriter and sets userHasTakenControl = true
+    if (selected.length > 0) {
+      console.log('[PROMTBOX] User uploaded image, calling markUserUpload');
+      window.aiPhotoCarousel?.markUserUpload?.();
+      console.log('[PROMTBOX] After markUserUpload, state.inputValue:', state.inputValue.substring(0, 50) + '...');
+    }
+
     for (const f of selected) {
       if (!isValidImageFile(f)) { flashError(`Only JPG, JPEG, PNG, WEBP up to ${MAX_MB} MB are allowed.`); continue; }
 
       const url = URL.createObjectURL(f);
       state.images.push({ file: f, url, source: "user" });
-
-      // Reset carousel landscape to normal (disable zoom, stop special positioning, keep paused)
-      window.aiPhotoCarousel?.resetCarouselLandscape?.();
 
       updateState();
       updateAddButtonState();
@@ -375,9 +424,34 @@ document.addEventListener("DOMContentLoaded", () => {
   generateButton?.addEventListener("click", (e) => {
     e.preventDefault();
 
-    syncPromptFromDOM();
-    const promptLive = state.inputValue.trim();
+    let promptLive;
+
+    // If typewriter is active, get the FULL prompt directly from carousel
+    if (state.isTypewriterActive) {
+      console.log('[PROMTBOX] Typewriter is active, getting full prompt from carousel...');
+      // Stop typewriter animation
+      window.searchFeature?.setTypewriterActive?.(false);
+      // Get the FULL prompt that was being typed
+      const fullPrompt = window.aiPhotoCarousel?.getFullPrompt?.();
+      if (fullPrompt) {
+        promptLive = fullPrompt;
+        console.log('[PROMTBOX] Got full prompt from carousel:', promptLive.substring(0, 50) + '...');
+        // Update the UI with full prompt
+        state.inputValue = fullPrompt;
+        if (textArea) textArea.value = fullPrompt;
+      } else {
+        // Fallback to current value
+        syncPromptFromDOM();
+        promptLive = state.inputValue.trim();
+      }
+    } else {
+      // Normal flow - sync from DOM
+      syncPromptFromDOM();
+      promptLive = state.inputValue.trim();
+    }
+
     const prompt = resolvePromptForSubmit(promptLive);
+    console.log('[PROMTBOX] Submitting prompt:', prompt.substring(0, 50) + '...');
     const needs = keywordNeedsImage(prompt);
 
     if (!prompt) { flashError("Please enter a prompt."); return; }
@@ -469,8 +543,10 @@ document.addEventListener("DOMContentLoaded", () => {
   window.searchFeature = {
     setPrompt(text, isTypewriter = false) {
       const next = text || "";
+      console.log('[PROMTBOX] setPrompt called with:', next.substring(0, 50) + '...', 'isTypewriter:', isTypewriter);
       state.inputValue = next;
       if (textArea) textArea.value = next;
+      console.log('[PROMTBOX] After setPrompt, state.inputValue:', state.inputValue.substring(0, 50) + '...');
       // Don't update char counter during typewriter animation
       if (!isTypewriter) {
         updateState();
@@ -481,10 +557,14 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     setExternalImage(url, slideKey) { addExternalImage(url, slideKey, "carousel"); },
     clearImages(scope = "all") { clearImagesByScope(scope); },
+    isInputFocused: () => state.active, // Expose focus state for carousel wheel navigation check
+    getLivePrompt: () => getLivePrompt(), // Expose current prompt value
     setTypewriterActive(active) {
+      const wasActive = state.isTypewriterActive;
       state.isTypewriterActive = !!active;
-      // Update char counter when typewriter stops
-      if (!active) {
+      // Stop typewriter in carousel when user takes control (prevent circular calls)
+      if (!active && wasActive) {
+        window.aiPhotoCarousel?.stopTypewriter?.();
         updateCharCounter();
       }
     },

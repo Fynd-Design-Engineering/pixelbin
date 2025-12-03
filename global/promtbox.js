@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
   const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
-  const HINT_ON_SUBMIT_ONLY = true;
+  const HINT_ON_SUBMIT_ONLY = false;
 
   const ACTION_FIRST_WORDS = ["remove","erase","delete","replace","edit","upscale"];
   const keywordNeedsImage = (text) => {

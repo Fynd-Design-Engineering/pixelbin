@@ -45,11 +45,16 @@ let isFocusZoomed = true, __frameScheduled = false; // Always zoomed by default 
 let typewriterInterval = null, typewriterIndex = 0, typewriterTargetPrompt = '';
 
 // ===== CONSTANTS =====
-const ROTATION_DELAY = 5000, SNAP_DURATION = 100, AUTO_TRANSFORM_MS = 700;
-const FOCUS_SCALE = 1, FOCUS_TRANSITION_MS = 750;
+const ROTATION_DELAY = 5000; // Time between auto-rotations
+const SNAP_DURATION = 1000; // Carousel snap animation duration (matches CSS transitions)
+const FOCUS_TRANSITION_MS = 750; // Focus transition timing
+const FOCUS_SCALE = 1; // No zoom effect
 const CENTER_SHADOW = '1px 18px 10px #8543ff08, 1px 3px 4px #630fff0a';
 const SOFT_SHADOW = '3px 6px 7px #630fff08, 1px 2px 4px #630fff0a';
 const LITE_SHADOW = '0 1px 2px rgba(0,0,0,0.08)';
+
+// Configuration
+const MANUAL_SCROLL = false; // Set to true to enable manual wheel scrolling
 
 // Simple gap system - just one value to control spacing
 const GAP_NORMAL = 12;      // Gap when not zoomed (user uploaded image)
@@ -118,6 +123,10 @@ const hasCarouselImage = (url, slideKey) => {
 };
 
 const hasUserOwnedImages = () => {
+  // First check if userHasTakenControl is true (most reliable)
+  if (userHasTakenControl) return true;
+
+  // Then check DOM as fallback
   const sec = getImagesSection();
   return sec ? Array.from(sec.querySelectorAll('.image-thumbnail'))
     .some(t => t.dataset.source === 'user' || !t.dataset.slideKey) : false;
@@ -228,12 +237,12 @@ function getDimsFromDistance(ad) {
 function createSlideHTML(slide, dimensions) {
   const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
   const shadowStyle = dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW;
-  const bgColor = slide.bgColor || '#e0e0e0';
+  const bgGradient = slide.bgColor || 'linear-gradient(135deg, rgba(79, 0, 158, 0.08) 0%, rgba(79, 0, 158, 0.04) 50%, rgba(79, 0, 158, 0.01) 100%)';
 
   return `
-    <div class="slide-card" style="border-radius:${rounded}px;box-shadow:${shadowStyle};background:${bgColor};">
+    <div class="slide-card" style="border-radius:${rounded}px;box-shadow:${shadowStyle};background:${bgGradient};">
       <img alt="${slide.label}" class="slide-card-single-img"
-           style="display:block;width:100%;height:100%;object-fit:cover;border-radius:${rounded}px;object-position:50% 50%;"
+           style="display:block;width:100%;height:100%;object-fit:cover;border-radius:${rounded}px;object-position:50% 50%;opacity:0;transition:opacity 250ms ease-out;"
            loading="eager" decoding="async" fetchpriority="high"
            src="${slide.images[0]}">
       <div class="slide-card-label-wrapper">
@@ -293,9 +302,27 @@ function initCarousel() {
     if (slideImage) {
       slideImage.dataset.srcBase = slide.images[0];
 
-      // Hero section - load all images eagerly for optimal LCP/FCP
-      slideImage.loading = 'eager';
-      slideImage.fetchPriority = dist0 < 0.5 ? 'high' : 'auto';
+      // Smart loading strategy for performance
+      // Center + Adjacent (±1): eager + high priority for smooth transitions
+      // Far slides (±2+): lazy load to save bandwidth
+      if (dist0 < 1.5) {
+        slideImage.loading = 'eager';
+        slideImage.fetchPriority = 'high'; // High priority for both center and adjacent
+      } else {
+        slideImage.loading = 'lazy';
+        slideImage.fetchPriority = 'auto';
+      }
+
+      // Natural fade-in when image loads
+      if (slideImage.complete) {
+        slideImage.classList.add('loaded');
+        slideImage.style.opacity = '1';
+      } else {
+        slideImage.addEventListener('load', () => {
+          slideImage.classList.add('loaded');
+          slideImage.style.opacity = '1';
+        }, { once: true });
+      }
       slideImage.src = variant(slideImage.dataset.srcBase, 450, 300);
       slideImage.decode().catch(() => {});
     }
@@ -319,18 +346,37 @@ function updatePositions_now() {
     // Mark center slide for gradient overlay
     wrapper.setAttribute('data-is-center', String(isCenter));
 
+    // Add/remove hover listeners for center slide to pause auto-rotation
+    if (isCenter && !wrapper.dataset.hoverListenerAdded) {
+      wrapper.dataset.hoverListenerAdded = 'true';
+      wrapper.addEventListener('mouseenter', () => {
+        if (!isUserActive && !userHasTakenControl) {
+          pauseRotation();
+        }
+      });
+      wrapper.addEventListener('mouseleave', () => {
+        if (!isUserActive && !userHasTakenControl && !hasUserOwnedImages()) {
+          // Resume rotation with immediate slide when mouse leaves
+          if (!isUserActive && !userHasTakenControl) {
+            startRotation(true);
+          }
+        }
+      });
+    }
+
     // Set dimensions - let CSS transitions handle the animation
     wrapper.style.overflow = 'visible';
     wrapper.style.width = dimensions.width + 'px';
     wrapper.style.height = dimensions.height + 'px';
     wrapper.style.opacity = currentMode === 'user' && ad > 1.5 ? '0.4' : String(dimensions.opacity);
     wrapper.style.visibility = isVisible ? 'visible' : 'hidden';
-    wrapper.style.zIndex = String(1000 - Math.round(ad * 10));
+    // Smoother z-index calculation - use finer granularity to prevent overlapping during transitions
+    wrapper.style.zIndex = String(1000 - Math.floor(ad * 100));
 
     // Use content-visibility for far slides to reduce rendering cost (CLS/TBT optimization)
     wrapper.style.contentVisibility = ad > 2 ? 'auto' : 'visible';
     // Optimize compositing for center and adjacent slides
-    wrapper.style.willChange = ad < 1.5 ? 'transform, width, height' : '';
+    wrapper.style.willChange = ad < 1.5 ? 'transform, width, height, opacity' : '';
 
     if (isMobile) {
       wrapper.style.bottom = '';
@@ -364,10 +410,13 @@ function updatePositions_now() {
   const currIdx = Math.round(currentOffset);
   if (currIdx !== _lastRoundedIndex) {
     _lastRoundedIndex = currIdx;
-    // Clear carousel images when slide changes to prevent confusion
-    window.searchFeature?.clearImages('carousel');
-    lastInjectedSlideId = null; // Allow re-injection on new slide
-    updatePrompt();
+    // Only clear carousel images when slide changes if user hasn't taken control
+    // Don't clear during injection to prevent thumbnails from disappearing
+    if (!userHasTakenControl && !injectionInProgress) {
+      window.searchFeature?.clearImages('carousel');
+      lastInjectedSlideId = null; // Allow re-injection on new slide
+    }
+    // Don't call updatePrompt here - let smoothSnapTo handle it after CSS transitions complete
   }
 }
 
@@ -377,23 +426,42 @@ function smoothSnapTo(targetOffset) {
   isSnapping = true;
   setMode('snapping');
 
+  // Clear old prompt immediately when carousel starts moving
+  if (typewriterInterval) {
+    clearInterval(typewriterInterval);
+    typewriterInterval = null;
+  }
+  typewriterIndex = 0;
+  typewriterTargetPrompt = '';
+  // Clear the input immediately
+  if (window.searchFeature && !isUserActive && !userHasTakenControl) {
+    window.searchFeature.setPrompt('', true);
+  }
+
   const start = performance.now(), from = currentOffset, delta = targetOffset - from;
   const tick = (now) => {
     const k = Math.min(1, (now - start) / SNAP_DURATION);
-    // Smooth cubic-bezier easing (0.4, 0, 0.2, 1)
-    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    // Luxurious ease-out easing for wow effect - starts fast, ends smooth
+    const e = 1 - Math.pow(1 - k, 3);
     currentOffset = from + delta * e;
     requestUpdate();
 
     if (k < 1) {
       snapRaf = requestAnimationFrame(tick);
     } else {
-      isSnapping = false;
+      // Smoothly set final position - no jarring snap
       currentOffset = targetOffset;
-      setMode('auto');
-      setUserActive(false);
-      requestUpdate();
-      updatePrompt();
+      requestUpdate(); // One final smooth update
+
+      // CSS transitions run in parallel with JS snap (both 1000ms)
+      // When snap completes, CSS is also complete - start typing immediately
+      // Use requestAnimationFrame for one frame delay to ensure rendering is complete
+      requestAnimationFrame(() => {
+        isSnapping = false; // Now safe to allow prompt updates
+        if (!isUserActive && !userHasTakenControl) {
+          updatePrompt();
+        }
+      });
     }
   };
   snapRaf = requestAnimationFrame(tick);
@@ -404,9 +472,11 @@ function nextSlide() {
   stopTypewriter(); // Stop typewriter when navigating
   if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
   if (!isUserActive && !hasUserOwnedImages()) userHasTakenControl = false;
-  // Clear carousel images when changing slides to prevent confusion
-  window.searchFeature?.clearImages('carousel');
-  lastInjectedSlideId = null; // Allow re-injection on new slide
+  // Only clear carousel images if user hasn't taken control and not injecting
+  if (!userHasTakenControl && !injectionInProgress) {
+    window.searchFeature?.clearImages('carousel');
+    lastInjectedSlideId = null; // Allow re-injection on new slide
+  }
   smoothSnapTo(Math.round(currentOffset) + 1);
   log(`➡️ Next`);
 }
@@ -416,9 +486,11 @@ function prevSlide() {
   stopTypewriter(); // Stop typewriter when navigating
   if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
   if (!isUserActive && !hasUserOwnedImages()) userHasTakenControl = false;
-  // Clear carousel images when changing slides to prevent confusion
-  window.searchFeature?.clearImages('carousel');
-  lastInjectedSlideId = null; // Allow re-injection on new slide
+  // Only clear carousel images if user hasn't taken control and not injecting
+  if (!userHasTakenControl && !injectionInProgress) {
+    window.searchFeature?.clearImages('carousel');
+    lastInjectedSlideId = null; // Allow re-injection on new slide
+  }
   smoothSnapTo(Math.round(currentOffset) - 1);
   log(`⬅️ Prev`);
 }
@@ -440,14 +512,24 @@ function handleResize() {
 }
 
 // ===== AUTO-ROTATION =====
-function startRotation() {
+function startRotation(slideImmediately = false) {
   if (autoInterval || isUserActive) return;
+
+  // Only slide immediately when resuming (blur/hover), not on page load
+  if (slideImmediately && !isUserActive && !isSnapping && !isDragging) {
+    setMode('auto');
+    const target = Math.round(currentOffset) + 1;
+    smoothSnapTo(target);
+    // updatePrompt will be called by smoothSnapTo after snap completes
+  }
+
+  // Then continue with regular intervals
   autoInterval = setInterval(() => {
     if (!isUserActive && !isSnapping && !isDragging) {
       setMode('auto');
-      currentOffset = Math.round(currentOffset) + 1;
-      requestUpdate();
-      updatePrompt();
+      const target = Math.round(currentOffset) + 1;
+      smoothSnapTo(target);
+      // updatePrompt will be called by smoothSnapTo after snap completes
     }
   }, ROTATION_DELAY);
   log('▶️ Auto started');
@@ -466,21 +548,31 @@ function setUserActive(active) {
   if (active) pauseRotation();
   else setTimeout(() => {
     if (!isUserActive && !isDragging && !userHasTakenControl && !hasUserOwnedImages()) startRotation();
-  }, 500);
+  }, 20);
 }
 
 // ===== PROMPT MANAGEMENT =====
 function stopTypewriter() {
+  // If typewriter was running, show the FULL prompt immediately
+  const wasTyping = typewriterInterval !== null;
+  const fullPrompt = typewriterTargetPrompt;
+
+  // Show full prompt FIRST before clearing anything
+  if (wasTyping && fullPrompt && window.searchFeature) {
+    console.log('[SILDER] Stopping typewriter, setting full prompt:', fullPrompt.substring(0, 50) + '...');
+    window.searchFeature.setPrompt(fullPrompt);
+  }
+
+  // THEN clear the typewriter state
   if (typewriterInterval) {
     clearInterval(typewriterInterval);
     typewriterInterval = null;
   }
   typewriterIndex = 0;
   typewriterTargetPrompt = '';
-  // Notify that typewriter stopped
-  if (window.searchFeature?.setTypewriterActive) {
-    window.searchFeature.setTypewriterActive(false);
-  }
+
+  // NOTE: Don't call setTypewriterActive(false) here to avoid circular calls
+  // The caller (promtbox.js) already set state.isTypewriterActive = false
 }
 
 function startTypewriter(fullPrompt) {
@@ -529,6 +621,9 @@ function updatePrompt() {
 
   // If user is focused on textarea, don't update prompt
   if (active && active.id === 'textArea') return;
+
+  // Don't update prompt while carousel is snapping - wait for transition to complete
+  if (isSnapping) return;
 
   const currentSlide = getCurrentSlide();
   const fullPrompt = prompts[currentSlide.label];
@@ -615,6 +710,9 @@ async function addCurrentSlideImage() {
     if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
     scheduleSyncBackend(); // Always multi-line, always sync
     // Don't call switchToMultiline() - keeps auto-rotation active
+
+    // Keep injection flag true for a bit longer to protect during rendering
+    await new Promise(resolve => setTimeout(resolve, 100));
   } finally {
     injectionInProgress = false;
   }
@@ -623,6 +721,9 @@ async function addCurrentSlideImage() {
 // ===== DESKTOP DRAG =====
 function beginDesktopDrag(e) {
   if (isMobile) return;
+  // Block dragging if user has taken control
+  if (userHasTakenControl) return;
+
   if (!isUserActive) setUserActive(true);
   if (isSnapping && snapRaf) { cancelAnimationFrame(snapRaf); snapRaf = null; isSnapping = false; }
 
@@ -673,8 +774,11 @@ function setupEventHandlers() {
     textArea.addEventListener('focus', () => {
       setUserActive(true); // This pauses auto-rotation
       pauseRotation(); // Explicitly pause when user focuses
-      // Always multi-line, enable zoom
-      isFocusZoomed = !isMobile;
+
+      // Only enable zoom if user hasn't uploaded their own image
+      // If user has their own image, carousel dimensions should stay normal
+      const userHasOwnImage = hasUserOwnedImages();
+      isFocusZoomed = !isMobile && !userHasOwnImage;
       requestUpdate(); // Immediately update dimensions when zoom changes
 
       if (!userHasTakenControl) {
@@ -704,27 +808,35 @@ function setupEventHandlers() {
         (rt && addBtn && isInside(addBtn, rt)) || (rt && genBtn && isInside(genBtn, rt));
 
       if (!focusStayedInside) {
-        setUserActive(false);
-        // Keep zoom active even on blur (always multi-line)
-        isFocusZoomed = !isMobile && !userHasTakenControl;
+        // Mark user as no longer active
+        isUserActive = false;
+
+        // If prompt is empty and no user images, reset user control
+        const currentPrompt = window.searchFeature?.getLivePrompt?.() || '';
+        if (!currentPrompt.trim() && !hasUserOwnedImages()) {
+          userHasTakenControl = false;
+        }
+
+        // Only re-enable zoom if user doesn't have their own image
+        const userHasOwnImage = hasUserOwnedImages();
+        isFocusZoomed = !isMobile && !userHasTakenControl && !userHasOwnImage;
         requestUpdate();
         injectToken++;
         if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
 
         // Clear carousel images when defocusing to allow clean auto-rotation
-        if (!userHasTakenControl) {
+        // Don't clear during injection to prevent thumbnails from disappearing
+        if (!userHasTakenControl && !injectionInProgress) {
           window.searchFeature?.clearImages('carousel');
           lastInjectedSlideId = null; // Allow re-injection on next focus
         }
 
-        // Resume auto-rotation if user hasn't taken control
-        if (!userHasTakenControl && !hasUserOwnedImages()) {
-          setTimeout(() => {
-            if (!isUserActive && !userHasTakenControl) {
-              startRotation();
-            }
-          }, 500);
-        }
+        // Start rotation with immediate first transition when defocusing
+        setTimeout(() => {
+          if (!isUserActive && !isDragging && !userHasTakenControl && !hasUserOwnedImages()) {
+            startRotation(true);
+          }
+        }, 20);
       }
     });
 
@@ -775,25 +887,37 @@ function setupEventHandlers() {
   const wheelSurface = q('slider-track');
   if (wheelSurface) {
     let wheelV = 0, wheelRAF = null, wheelAnimating = false, lastWheelTime = 0;
-    const WHEEL_SENSITIVITY = 0.008, WHEEL_FRICTION = 0.88, WHEEL_MIN_V = 0.005, WHEEL_TIMEOUT = 150, SNAP_THRESHOLD = 0.15;
-    let wheelTimeout = null, wheelDebounceTimer = null;
+    const WHEEL_SENSITIVITY = 0.004, WHEEL_FRICTION = 0.93, WHEEL_MIN_V = 0.002, WHEEL_TIMEOUT = 100, SNAP_THRESHOLD = 0.25;
+    let wheelTimeout = null;
 
     wheelSurface.addEventListener('wheel', (e) => {
+      // If manual scroll is disabled, don't handle wheel events
+      if (!MANUAL_SCROLL) return;
+
+      // Block wheel scrolling if user has taken control
+      if (userHasTakenControl) return;
+
       const absX = Math.abs(e.deltaX), absY = Math.abs(e.deltaY);
       const horizontalIntent = absX > absY * 1.2 || (absX > 0 && absY === 0);
       const useShiftAsHorizontal = e.shiftKey && absX < absY;
+
+      // Don't allow carousel navigation when input is focused - allow all scrolling
+      if (window.searchFeature?.isInputFocused?.()) return;
+
+      // If not horizontal intent, allow page scroll
       if (!horizontalIntent && !useShiftAsHorizontal) return;
 
+      // Only prevent default when we're actually handling horizontal scroll
       e.preventDefault();
 
-      // Debounce non-critical updates for better INP
-      if (wheelDebounceTimer) clearTimeout(wheelDebounceTimer);
-      wheelDebounceTimer = setTimeout(() => {
-        setUserActive(true);
-        // Temporarily disable zoom while scrolling
+      // Set user active immediately to avoid flickering
+      setUserActive(true);
+
+      // Temporarily disable zoom while scrolling (do it once, not repeatedly)
+      if (isFocusZoomed) {
         isFocusZoomed = false;
         requestUpdate();
-      }, 16);
+      }
 
       lastWheelTime = performance.now();
 
@@ -851,7 +975,10 @@ function setupEventHandlers() {
       }, WHEEL_TIMEOUT);
     }, { passive: false });
 
-    if (!isMobile) wheelSurface.style.cursor = 'grab';
+    // Set cursor based on user control state
+    if (!isMobile) {
+      wheelSurface.style.cursor = userHasTakenControl ? 'default' : 'grab';
+    }
     wheelSurface.addEventListener('pointerdown', (e) => {
       if (isMobile || (e.pointerType && e.pointerType !== 'mouse' && e.pointerType !== 'pen')) return;
       const active = document.activeElement;
@@ -891,6 +1018,8 @@ window.aiPhotoCarousel = {
   pauseRotation,
   startRotation,
   expandPrompt,
+  stopTypewriter, // Expose stopTypewriter
+  getFullPrompt: () => typewriterTargetPrompt || storedPrompt, // Get the full prompt
   clearImages: (scope = 'all') => {
     const sec = getImagesSection();
     if (!sec) return;
@@ -909,11 +1038,17 @@ window.aiPhotoCarousel = {
     const s = slides.find(x => x.id === id);
     if (s) s.injectUrl = (url || '').trim();
   },
-  markUserUpload(url) {
+  markUserUpload() {
+    stopTypewriter(); // Stop typewriter immediately when user uploads
     userHasTakenControl = true;
     // Don't clear images or sync - homepage.js already handled the user upload
     pauseRotation();
     isFocusZoomed = false; // Disable zoom when user uploads
+
+    // Update cursor to default (not grabbable)
+    const track = q('slider-track');
+    if (track && !isMobile) track.style.cursor = 'default';
+
     requestUpdate();
     // Don't call scheduleSyncBackend() - it would convert the user's File to an external URL
   },
@@ -922,15 +1057,27 @@ window.aiPhotoCarousel = {
     isFocusZoomed = false; // Disable zoom
     userHasTakenControl = true;
     pauseRotation();
+
+    // Update cursor to default (not grabbable)
+    const track = q('slider-track');
+    if (track && !isMobile) track.style.cursor = 'default';
+
     requestUpdate();
   },
   resetAfterImageRemoval() {
     // Reset carousel state when user removes all images
     userHasTakenControl = false;
-    isFocusZoomed = !isMobile; // Re-enable zoom (always multi-line)
+    // Only re-enable zoom if user has removed all their images
+    const stillHasUserImages = hasUserOwnedImages();
+    isFocusZoomed = !isMobile && !stillHasUserImages;
+
+    // Restore cursor to grab when user releases control
+    const track = q('slider-track');
+    if (track && !isMobile) track.style.cursor = 'grab';
+
     requestUpdate();
-    // Resume auto-rotation - always multi-line, always can resume
-    if (!hasUserOwnedImages()) {
+    // Resume auto-rotation only if no user images remain
+    if (!stillHasUserImages) {
       startRotation();
     }
   },

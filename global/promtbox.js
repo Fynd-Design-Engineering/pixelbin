@@ -167,10 +167,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentUrls = state.images.map(img => img.url);
     const currentCount = state.images.length;
 
+    // Check if DOM is out of sync with state (images in state but not in DOM)
+    const domChildCount = imagesSection.children.length;
+    const domOutOfSync = currentCount > 0 && domChildCount === 0;
+
     // Always re-render if count changed (even if URLs are the same)
     // This handles clear + re-inject scenarios
     const hasChanged = currentCount !== lastRenderedCount ||
-                       currentUrls.some((url, idx) => url !== lastRenderedUrls[idx]);
+                       currentUrls.some((url, idx) => url !== lastRenderedUrls[idx]) ||
+                       domOutOfSync; // Force render if DOM was cleared but state has images
 
     // Skip re-render if nothing changed
     if (!hasChanged) return;

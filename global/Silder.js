@@ -177,10 +177,10 @@ function getAxisSizes() {
   if (!isMobile) {
     // Zoomed: use actual rendered widths for correct positioning
     if (zoomActive()) {
-      return { center: 748, adjacent: 328, far: 328 };
+      return { center: 748, adjacent: 500, far: 328 };
     }
     // Not zoomed: normal sizes
-    return { center: 328, adjacent: 328, far: 328 };
+    return { center: 500, adjacent: 500, far: 328 };
   }
   // Mobile sizes
   return { center: 328, adjacent: 328, far: 328 };
@@ -222,11 +222,11 @@ function getDimsFromDistance(ad) {
     if (zoomActive()) return { width: 748, height: 437, opacity: 1, yOffset: 0, shadow: true };
     return isMobile
       ? { width: 328, height: 376, opacity: 1, yOffset: 0, shadow: true }  // Reduced from 360x451 to fit 320px screens
-      : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };
+      : { width: 500, height: 437, opacity: 1, yOffset: 0, shadow: true };
   } else if (ad < 1.5) {
     return isMobile
       ? { width: 328, height: 437, opacity: 0.3, yOffset: 0, shadow: false }  // Adjacent images at -1 and +1 position
-      : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };
+      : { width: 500, height: 437, opacity: 0.9, yOffset: 0, shadow: false };
   }
   return isMobile
     ? { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
@@ -356,9 +356,9 @@ function updatePositions_now() {
       });
       wrapper.addEventListener('mouseleave', () => {
         if (!isUserActive && !userHasTakenControl && !hasUserOwnedImages()) {
-          // Resume rotation with immediate slide when mouse leaves
+          // Resume rotation without immediate slide - only slide on click outside (blur)
           if (!isUserActive && !userHasTakenControl) {
-            startRotation(true);
+            startRotation(false); // Don't slide immediately on hover out
           }
         }
       });

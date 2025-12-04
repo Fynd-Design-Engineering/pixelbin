@@ -410,10 +410,9 @@ function updatePositions_now() {
   const currIdx = Math.round(currentOffset);
   if (currIdx !== _lastRoundedIndex) {
     _lastRoundedIndex = currIdx;
-    // Only clear carousel images when slide changes if user hasn't taken control
-    // Don't clear during injection to prevent thumbnails from disappearing
+    // Reset injection ID when slide changes to allow re-injection
+    // But don't clear images here - only clear during explicit navigation
     if (!userHasTakenControl && !injectionInProgress) {
-      window.searchFeature?.clearImages('carousel');
       lastInjectedSlideId = null; // Allow re-injection on new slide
     }
     // Don't call updatePrompt here - let smoothSnapTo handle it after CSS transitions complete
@@ -704,7 +703,8 @@ async function addCurrentSlideImage() {
   lastInjectedSlideId = currentSlide.id;
 
   try {
-    if (!userHasTakenControl) window.searchFeature?.clearImages('carousel');
+    // Don't clear before injecting - just add/replace directly
+    // The hasCarouselImage check above already prevents duplicates
     await window.searchFeature?.setExternalImage(imageUrl, slideKey);
     const addBtn = q('addButton');
     if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }

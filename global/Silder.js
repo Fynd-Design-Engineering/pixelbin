@@ -225,11 +225,11 @@ function getDimsFromDistance(ad) {
       : { width: 328, height: 437, opacity: 1, yOffset: 0, shadow: true };
   } else if (ad < 1.5) {
     return isMobile
-      ? { width: 328, height: 437, opacity: 0.3, yOffset: 0, shadow: false }  // Adjacent images at -1 and +1 position
+      ? { width: 328, height: 437, opacity: 0.2, yOffset: 0, shadow: false }  // Adjacent images at -1 and +1 position
       : { width: 328, height: 437, opacity: 0.9, yOffset: 0, shadow: false };
   }
   return isMobile
-    ? { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
+    ? { width: 328, height: 437, opacity: 0.2, yOffset: 0, shadow: false }  // Reduced opacity from 0.2 to 0.15 for better text visibility
     : { width: 328, height: 437, opacity: 0.5, yOffset: 0, shadow: false };  // Reduced opacity from 0.2 to 0.15 for better text visibility
 }
 

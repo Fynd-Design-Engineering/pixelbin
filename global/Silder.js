@@ -1,1404 +1,1052 @@
+/**
+ * AI PHOTO EDITOR CAROUSEL - Delightfully Smooth & Lightweight
+ */
 
+const DEBUG = false;
+const log = (...a) => DEBUG && console.log(...a);
 
-        import { animate } from 'https://cdn.jsdelivr.net/npm/motion@10.18.0/+esm';
+console.log('✨ AI Photo Editor Carousel - Delightfully Smooth & Lightweight');
 
-        // ===== DATA =====
-        const slides = [
-            { id: 1, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/01_Photoshoot.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Photoshoot' },
-            { id: 2, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/02_Ad_Creative.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Ad Creative' },
-            { id: 3, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/03_upscale.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Upscale_OG_Image.jpg', label: 'Upscale' },
-            { id: 4, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/04_Logo.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Logo' },
-            { id: 5, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/08_Remove_BG.avif?w=900&h=600&fit=cover&auto=format'],injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Remove_BG_Original_Image.jpg',  label: 'Remove background' },
-            { id: 6, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/07_Social_Media.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Social media' },
-            { id: 7, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/09_Digital_Art.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Digital Art' },
-            { id: 8, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/06_Wm.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Wm_OG_Image.jpg', label: 'Remove watermarks' },
-            { id: 9, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/05_poster.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Poster' }
-        ];
+// ===== DATA =====
+const slides = [
+  { id: 1, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/01_Photoshoot.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Photoshoot' },
+  { id: 2, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/02_Ad_Creative.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Ad Creative' },
+  { id: 3, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/03_upscale.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Upscale_OG_Image.jpg', label: 'Upscale' },
+  { id: 4, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/04_Logo.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Logo' },
+  { id: 5, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/08_Remove_BG.avif?w=900&h=600&fit=cover&auto=format'],injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Remove_BG_Original_Image.jpg',  label: 'Remove background' },
+  { id: 6, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/07_Social_Media.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Social media' },
+  { id: 7, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/09_Digital_Art.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Digital Art' },
+  { id: 8, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/06_Wm.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Wm_OG_Image.jpg', label: 'Remove watermarks' },
+  { id: 9, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/05_poster.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Poster' }
+];
 
-        const prompts = {
-            'Photoshoot': 'A luxury fashion campaign portrait of a confident woman in a blush pink tailored suit with a bralette underneath. She stands against a neutral beige fabric backdrop with soft shadows adding dimension. Her gaze is powerful, hair styled effortlessly sleek. Lighting is soft but directional, highlighting the satin sheen of the suit fabric. Ultra-realistic textures, clean editorial finish, cinematic luxury advertising style.',
-            'Ad Creative': 'A playful food campaign visual featuring two colorful eclairs - one chocolate, one strawberry - floating on a pastel blue background. Repeating text pattern reads "So Yum" in centre in all caps white sans-serif font. Soft shadows and realistic textures on the pastries. Fun, graphic, and modern lifestyle branding aesthetic.',
-            'Poster': 'A retro-inspired sneaker poster ad featuring a pair of Nike Dunk High sneakers in burnt orange and white, floating mid-air against a bright blue sky with soft white clouds. The sneakers are shown in photorealistic detail with visible leather texture, stitching, and laces, arranged to highlight both the side profile and top view. The composition is minimalist, with the Nike swoosh logo and bold white text placed subtly around the frame, alongside smaller retro tagline text with a slightly blurred, print-like effect. The overall style has a vintage sports ad aesthetic with a dreamy, nostalgic mood, enhanced by a grainy overlay and soft tones, evoking the feel of classic 90s sneaker campaigns',
-            'Digital Art': 'A minimalist surreal scene featuring a human silhouette made of translucent water standing on a dry cracked desert floor. The figure mirrors the sky above, reflecting clouds and light. Colors are muted - soft ivory, desaturated cyan, and warm beige. Lighting is cinematic and diffused. Symbolic, emotional, and deeply aesthetic digital artwork.',
-            'Social media': 'A lifestyle beverage ad featuring a chilled Corona-style beer bottle leaning casually against a carved sandy surface with soft ripples, surrounded by freshly sliced limes glistening with juice. Golden sunlight spills across the scene, illuminating condensation droplets and highlighting the rich amber tones of the beer. The background features smooth, sunlit sand tones for a relaxed beach-day feel. Overlay elegant, minimalist text at the top that reads "Taste the Sun" in bold modern sans-serif, with a smaller tagline below: "Golden moments. Cold beer. Endless summer." The overall image is cinematic, hyper-detailed, and refreshing - a premium lifestyle campaign visual designed for social media.',
-            'Remove watermarks': 'Remove the watermark from this image',
-            'Logo': 'A minimalist logo design for a luxury skincare brand named "LUNEA". The logo features thin modern serif typography paired with a delicate crescent moon motif integrated into the text. Only two colors - moss green and ivory. Clean composition with balanced negative space on a textured off-white background. Elegant, calm, and modern wellness-inspired identity.',
-            'Remove background': 'Remove background of this image',
-            'Upscale': 'Upscale this image'
-        };
+const prompts = {
+  'Photoshoot': 'A luxury fashion campaign portrait of a confident woman in a blush pink tailored suit with a bralette underneath. She stands against a neutral beige fabric backdrop with soft shadows adding dimension. Her gaze is powerful, hair styled effortlessly sleek. Lighting is soft but directional, highlighting the satin sheen of the suit fabric. Ultra-realistic textures, clean editorial finish, cinematic luxury advertising style.',
+  'Ad Creative': 'A playful food campaign visual featuring two colorful eclairs - one chocolate, one strawberry - floating on a pastel blue background. Repeating text pattern reads "So Yum" in centre in all caps white sans-serif font. Soft shadows and realistic textures on the pastries. Fun, graphic, and modern lifestyle branding aesthetic.',
+  'Poster': 'A retro-inspired sneaker poster ad featuring a pair of Nike Dunk High sneakers in burnt orange and white, floating mid-air against a bright blue sky with soft white clouds. The sneakers are shown in photorealistic detail with visible leather texture, stitching, and laces, arranged to highlight both the side profile and top view. The composition is minimalist, with the Nike swoosh logo and bold white text placed subtly around the frame, alongside smaller retro tagline text with a slightly blurred, print-like effect. The overall style has a vintage sports ad aesthetic with a dreamy, nostalgic mood, enhanced by a grainy overlay and soft tones, evoking the feel of classic 90s sneaker campaigns',
+  'Digital Art': 'A minimalist surreal scene featuring a human silhouette made of translucent water standing on a dry cracked desert floor. The figure mirrors the sky above, reflecting clouds and light. Colors are muted - soft ivory, desaturated cyan, and warm beige. Lighting is cinematic and diffused. Symbolic, emotional, and deeply aesthetic digital artwork.',
+  'Social media': 'A lifestyle beverage ad featuring a chilled Corona-style beer bottle leaning casually against a carved sandy surface with soft ripples, surrounded by freshly sliced limes glistening with juice. Golden sunlight spills across the scene, illuminating condensation droplets and highlighting the rich amber tones of the beer. The background features smooth, sunlit sand tones for a relaxed beach-day feel. Overlay elegant, minimalist text at the top that reads "Taste the Sun" in bold modern sans-serif, with a smaller tagline below: "Golden moments. Cold beer. Endless summer." The overall image is cinematic, hyper-detailed, and refreshing - a premium lifestyle campaign visual designed for social media.',
+  'Remove watermarks': 'Remove the watermark from this image',
+  'Logo': 'A minimalist logo design for a luxury skincare brand named "LUNEA". The logo features thin modern serif typography paired with a delicate crescent moon motif integrated into the text. Only two colors - moss green and ivory. Clean composition with balanced negative space on a textured off-white background. Elegant, calm, and modern wellness-inspired identity.',
+  'Remove background': 'Remove background of this image',
+  'Upscale': 'Upscale this image'
+};
 
-        // Helper function to get slide data
-        function getSlideData(slideElement) {
-            const label = slideElement.getAttribute('data-label');
-            const injectUrl = slideElement.getAttribute('data-inject-url') || '';
-            const prompt = prompts[label] || '';
-            const slideIndex = slideElement.getAttribute('data-slide-index');
+// ===== STATE =====
+let currentOffset = 0, snapRaf = null, isMobile = window.innerWidth < 768;
+let slideElements = [], sliderTrack, autoInterval = null, isUserActive = false;
+let storedPrompt = '', userHasTakenControl = false;
+let pendingInjectTimeout = null, injectToken = 0, syncTimer = null, syncInFlight = false;
+let _lastRoundedIndex = null;
+let isDragging = false, dragStartX = 0, dragStartOffset = 0, suppressNextBlur = false;
+let dragVelocity = 0, lastDragX = 0, lastDragTime = 0, dragMomentumRAF = null;
+let injectionInProgress = false, lastInjectedSlideId = null;
+let isFocusZoomed = true, __frameScheduled = false;
+let typewriterInterval = null, typewriterIndex = 0, typewriterTargetPrompt = '';
 
-            return {
-                label,
-                injectUrl,
-                prompt,
-                slideIndex
-            };
+// ===== CONSTANTS =====
+const ROTATION_DELAY = 5000;
+const SNAP_DURATION = 650;
+const DRAG_TRANSITION_MS = 0;
+const FOCUS_TRANSITION_MS = 650;
+const SIZE_TRANSITION_FAST_MS = 650;
+const SIZE_TRANSITION_SMOOTH_MS = 350;
+const FOCUS_SCALE = 1;
+const CENTER_SHADOW = '1px 18px 10px #8543ff08, 1px 3px 4px #630fff0a';
+const SOFT_SHADOW   = '3px 6px 7px #630fff08, 1px 2px 4px #630fff0a';
+const LITE_SHADOW   = '0 1px 2px rgba(0,0,0,0.08)';
+
+const EASE_OUT_EXPO   = 'cubic-bezier(0.19, 1, 0.22, 1)';
+const EASE_OUT_QUAD   = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+const MANUAL_SCROLL = true;
+
+const GAP_DESKTOP = 12;
+const GAP_MOBILE = 100;
+const SLIDE_WIDTH = 328;
+
+// ===== MODES =====
+let isSnapping = false, currentMode = 'auto', lastMode = null;
+
+const setMode = (mode) => {
+  currentMode = mode;
+  if (lastMode === mode) return;
+  lastMode = mode;
+
+  const transformTime = mode === 'user' ? DRAG_TRANSITION_MS : FOCUS_TRANSITION_MS;
+  const transformEasing = mode === 'user' ? 'linear' : EASE_OUT_EXPO;
+
+  const sizeTime = mode === 'user' ? SIZE_TRANSITION_FAST_MS : SIZE_TRANSITION_SMOOTH_MS;
+  const sizeEasing = mode === 'user' ? EASE_OUT_EXPO : EASE_OUT_QUAD;
+  const sizeFade = `width ${sizeTime}ms ${sizeEasing}, height ${sizeTime}ms ${sizeEasing}, opacity ${sizeTime}ms ${sizeEasing}`;
+
+  const trackTrans = `transform ${transformTime}ms ${transformEasing}, ${sizeFade}`;
+
+  slideElements.forEach(({ wrapper, slideCard, slideImage }) => {
+    if (wrapper) wrapper.style.transition = trackTrans;
+    if (slideCard) wrapper && (slideCard.style.transition = `transform ${transformTime}ms ${transformEasing}`);
+    if (slideImage) slideImage.style.transition = `object-position ${transformTime}ms ${transformEasing}, border-radius ${sizeTime}ms ${sizeEasing}`;
+  });
+};
+
+// ===== UTILS =====
+const q = (id) => document.getElementById(id);
+const getImagesSection = () => q('imagesSection');
+const zoomActive = () => !isMobile && isFocusZoomed;
+const isInside = (root, node) => !!root && (root === node || root.contains(node));
+const getClientX = (e) => (e.touches?.[0]?.clientX) || e.clientX || 0;
+
+function requestUpdate() {
+  if (__frameScheduled) return;
+  __frameScheduled = true;
+  requestAnimationFrame(() => {
+    __frameScheduled = false;
+    updatePositions_now();
+  });
+}
+
+function variant(url, w, h) {
+  try {
+    const u = new URL(url, window.location.href);
+    ['w','h','fit','auto','dpr'].forEach(k => u.searchParams.delete(k));
+    if (w) u.searchParams.set('w', w);
+    if (h) u.searchParams.set('h', h);
+    u.searchParams.set('fit', 'cover');
+    u.searchParams.set('auto', 'format');
+    return u.toString();
+  } catch {
+    return `${url.split('?')[0]}?w=${w}&h=${h}&fit=cover&auto=format`;
+  }
+}
+
+const getUIImageURLs = () => {
+  const sec = getImagesSection();
+  return sec ? Array.from(sec.querySelectorAll('.image-thumbnail')).map(t => t.dataset.url).filter(Boolean) : [];
+};
+
+const hasCarouselImage = (url, slideKey) => {
+  const sec = getImagesSection();
+  return sec ? Array.from(sec.querySelectorAll('.image-thumbnail'))
+    .some(t => t.dataset.source === 'carousel' && (t.dataset.url === url || t.dataset.slideKey === slideKey)) : false;
+};
+
+const hasUserOwnedImages = () => {
+  if (userHasTakenControl) return true;
+  const sec = getImagesSection();
+  return sec ? Array.from(sec.querySelectorAll('.image-thumbnail'))
+    .some(t => t.dataset.source === 'user' || !t.dataset.slideKey) : false;
+};
+
+// ===== BACKEND SYNC =====
+function scheduleSyncBackend() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    if (!window.searchFeature || syncInFlight) return;
+    syncInFlight = true;
+    try {
+      const urls = getUIImageURLs();
+      window.searchFeature.clearImages?.();
+      urls.forEach(u => window.searchFeature.setExternalImage?.(u));
+      log('🔁 Backend synced:', urls);
+    } finally {
+      syncInFlight = false;
+    }
+  }, 50);
+}
+
+function proxyBackend() {
+  const sf = window.searchFeature;
+  if (!sf || sf.__proxied) return;
+  const origClear = sf.clearImages?.bind(sf);
+  const origSet = sf.setExternalImage?.bind(sf);
+  if (origClear) sf.clearImages = (...args) => origClear(...args);
+  if (origSet) sf.setExternalImage = (url, ...rest) => origSet(url, ...rest);
+  sf.__proxied = true;
+}
+
+// ===== CAROUSEL MATH =====
+const normIndex = (i) => ((i % slides.length) + slides.length) % slides.length;
+const getCurrentSlide = () => slides[normIndex(Math.round(currentOffset))];
+
+function getSignedDistance(absoluteIndex, offset = currentOffset) {
+  const total = slides.length;
+  const slide = normIndex(absoluteIndex);
+  const curr = ((offset % total) + total) % total;
+  let d = slide - curr;
+  if (d > total / 2) d -= total;
+  if (d < -total / 2) d += total;
+  return d;
+}
+
+const getCurrentGap = () => (isMobile ? GAP_MOBILE : GAP_DESKTOP);
+
+const NOMINAL_STEP = () => {
+  const gap = getCurrentGap();
+  if (isMobile) return SLIDE_WIDTH + gap;
+  return zoomActive() ? 550 : SLIDE_WIDTH + gap;
+};
+
+const pxToOffset = (deltaPx) => -deltaPx / NOMINAL_STEP();
+
+function getCardPosition(absoluteIndex, offset = currentOffset) {
+  const d = getSignedDistance(absoluteIndex, offset);
+  const gap = getCurrentGap();
+
+  if (isMobile) return d * (SLIDE_WIDTH + gap);
+
+  if (!zoomActive()) return d * (SLIDE_WIDTH + gap);
+
+  const absD = Math.abs(d);
+  const sign = d >= 0 ? 1 : -1;
+
+  const getInterpolatedWidth = (dist) => {
+    const ad = Math.abs(dist);
+    if (ad <= 0.5) return 748 - (748 - 328) * (ad / 0.5);
+    return 328;
+  };
+
+  if (absD === 0) return 0;
+
+  let position = 0;
+
+  for (let i = 0; i < Math.floor(absD); i++) {
+    const currentWidth = getInterpolatedWidth(i);
+    const nextWidth = getInterpolatedWidth(i + 1);
+    position += currentWidth / 2 + gap + nextWidth / 2;
+  }
+
+  const fractional = absD - Math.floor(absD);
+  if (fractional > 0) {
+    const currentWidth = getInterpolatedWidth(Math.floor(absD));
+    const nextWidth = getInterpolatedWidth(Math.floor(absD) + 1);
+    const stepSize = currentWidth / 2 + gap + nextWidth / 2;
+    position += fractional * stepSize;
+  }
+
+  return position * sign;
+}
+
+function getDimsFromDistance(ad) {
+  const baseHeight = isMobile ? 376 : 437;
+  const opacity = isMobile ? (ad < 0.5 ? 1 : 0.1) : 1;
+
+  if (ad < 0.5) {
+    if (zoomActive()) return { width: 748, height: baseHeight, opacity, yOffset: 0, shadow: true };
+    return { width: 328, height: baseHeight, opacity, yOffset: 0, shadow: true };
+  }
+  return { width: 328, height: baseHeight, opacity, yOffset: 0, shadow: false };
+}
+
+// ===== DOM BUILD =====
+function createSlideHTML(slide, dimensions) {
+  const rounded = dimensions.shadow ? (isMobile ? 20.577 : 27.436) : 13.718;
+  const shadowStyle = dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW;
+  const bgGradient = slide.bgColor || 'linear-gradient(135deg, rgba(79, 0, 158, 0.08) 0%, rgba(79, 0, 158, 0.04) 50%, rgba(79, 0, 158, 0.01) 100%)';
+
+  return `
+    <div class="slide-card" style="border-radius:${rounded}px;box-shadow:${shadowStyle};background:${bgGradient};">
+      <img alt="${slide.label}" class="slide-card-single-img"
+           style="display:block;width:100%;height:100%;object-fit:cover;border-radius:${rounded}px;object-position:50% 50%;opacity:0;transition:opacity 250ms ease-out;"
+           loading="eager" decoding="async" fetchpriority="high"
+           src="${slide.images[0]}">
+      <div class="slide-card-label-wrapper">
+        <div class="slide-card-label">
+          <div class="slide-card-label-text"><p>${slide.label}</p></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function initCarousel() {
+  log('🔄 Initializing carousel');
+  sliderTrack = q('slider-track');
+  if (!sliderTrack) { console.error('❌ Slider track not found!'); return; }
+
+  sliderTrack.innerHTML = '';
+  slideElements = [];
+
+  if (!document.querySelector('link[rel="preconnect"][href*="pixelbin.io"]')) {
+    const preconnect = document.createElement('link');
+    preconnect.rel = 'preconnect';
+    preconnect.href = 'https://cdn.pixelbin.io';
+    preconnect.crossOrigin = 'anonymous';
+    document.head.appendChild(preconnect);
+
+    const dnsPrefetch = document.createElement('link');
+    dnsPrefetch.rel = 'dns-prefetch';
+    dnsPrefetch.href = 'https://cdn.pixelbin.io';
+    document.head.appendChild(dnsPrefetch);
+  }
+
+  slides.forEach((slide, idx) => {
+    const dist0 = Math.abs(getSignedDistance(idx, 0));
+    const dims = getDimsFromDistance(dist0);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'slide-card-wrapper';
+    wrapper.dataset.absoluteIndex = String(idx);
+    wrapper.style.overflow = 'visible';
+
+    // ✅ SINGLE click handler (no duplicates)
+    wrapper.addEventListener('click', () => onSlideClickCenter(idx));
+
+    const cardContainer = document.createElement('div');
+    cardContainer.style.cssText = 'width:100%;height:100%;';
+    cardContainer.innerHTML = createSlideHTML(slide, dims);
+
+    wrapper.appendChild(cardContainer);
+    sliderTrack.appendChild(wrapper);
+
+    const slideCard = cardContainer.querySelector('.slide-card');
+    const slideImage = cardContainer.querySelector('.slide-card-single-img');
+
+    slideElements.push({ wrapper, cardContainer, slide, absoluteIndex: idx, slideCard, slideImage });
+
+    if (slideImage) {
+      slideImage.dataset.srcBase = slide.images[0];
+
+      if (dist0 < 1.5) {
+        slideImage.loading = 'eager';
+        slideImage.fetchPriority = 'high';
+      } else {
+        slideImage.loading = 'lazy';
+        slideImage.fetchPriority = 'auto';
+      }
+
+      if (slideImage.complete) {
+        slideImage.classList.add('loaded');
+        slideImage.style.opacity = '1';
+      } else {
+        slideImage.addEventListener('load', () => {
+          slideImage.classList.add('loaded');
+          slideImage.style.opacity = '1';
+        }, { once: true });
+      }
+
+      slideImage.src = variant(slideImage.dataset.srcBase, 450, 300);
+      slideImage.decode().catch(() => {});
+    }
+  });
+
+  currentOffset = 0;
+  setMode('auto');
+  requestUpdate();
+  setTimeout(updatePrompt, 100);
+  scheduleSyncBackend();
+}
+
+function updatePositions_now() {
+  slideElements.forEach(({ wrapper, slideCard, slideImage, absoluteIndex }) => {
+    const ad = Math.abs(getSignedDistance(absoluteIndex, currentOffset));
+    const position = getCardPosition(absoluteIndex, currentOffset);
+    const isVisible = ad <= 5;
+    const dimensions = getDimsFromDistance(ad);
+    const isCenter = ad < 0.5;
+
+    wrapper.setAttribute('data-is-center', String(isCenter));
+
+    if (isCenter && !wrapper.dataset.hoverListenerAdded) {
+      wrapper.dataset.hoverListenerAdded = 'true';
+      wrapper.addEventListener('mouseenter', () => {
+        if (!isUserActive && !userHasTakenControl) pauseRotation();
+      });
+      wrapper.addEventListener('mouseleave', () => {
+        if (!isUserActive && !userHasTakenControl && !hasUserOwnedImages()) startRotation(false);
+      });
+    }
+
+    wrapper.style.width = dimensions.width + 'px';
+    wrapper.style.height = dimensions.height + 'px';
+    wrapper.style.opacity = String(dimensions.opacity);
+    wrapper.style.visibility = isVisible ? 'visible' : 'hidden';
+    wrapper.style.zIndex = String(1000 - Math.floor(ad * 100));
+
+    wrapper.style.contentVisibility = ad > 3 ? 'auto' : 'visible';
+    wrapper.style.contain = ad > 2 ? 'layout style paint' : '';
+    wrapper.style.willChange = ad < 2.5 ? 'transform, width, height, opacity' : '';
+
+    if (isMobile) {
+      wrapper.style.top = '50%';
+      wrapper.style.left = '50%';
+      wrapper.style.bottom = '';
+      wrapper.style.transform = `translate3d(-50%, calc(-50% + ${position}px), 0)`;
+    } else {
+      wrapper.style.left = '50%';
+      wrapper.style.bottom = '0';
+      wrapper.style.top = '';
+      wrapper.style.transform = `translate3d(${position}px, 0, 0) translateX(-50%)`;
+    }
+
+    if (slideCard) {
+      const shadowStyle =
+        currentMode === 'user'
+          ? (ad < 0.5 ? CENTER_SHADOW : LITE_SHADOW)
+          : (dimensions.shadow ? CENTER_SHADOW : SOFT_SHADOW);
+
+      slideCard.style.borderRadius = '24px';
+      slideCard.style.boxShadow = shadowStyle;
+      slideCard.style.willChange = ad < 2.5 ? 'transform, opacity' : '';
+      slideCard.style.transformOrigin = '50% 50%';
+      slideCard.style.transform = `scale(${(zoomActive() && ad < 0.5) ? FOCUS_SCALE : 1})`;
+    }
+
+    if (slideImage) {
+      slideImage.style.borderRadius = '24px';
+      slideImage.style.objectPosition = '50% 50%';
+    }
+  });
+
+  const currIdx = Math.round(currentOffset);
+  if (currIdx !== _lastRoundedIndex) {
+    _lastRoundedIndex = currIdx;
+    if (!userHasTakenControl && !injectionInProgress) lastInjectedSlideId = null;
+  }
+}
+
+// ===== CLICK-TO-CENTER =====
+function snapToAbsoluteIndex(absIndex) {
+  const d = getSignedDistance(absIndex, currentOffset);
+  if (Math.abs(d) < 0.0001) return;
+  smoothSnapTo(currentOffset + d);
+}
+
+function onSlideClickCenter(absIndex) {
+  const active = document.activeElement;
+  if (active && active.id === 'textArea') return;
+  if (isSnapping || isDragging) return;
+
+  injectToken++;
+  stopTypewriter();
+
+  if (pendingInjectTimeout) {
+    clearTimeout(pendingInjectTimeout);
+    pendingInjectTimeout = null;
+  }
+
+  if (!isUserActive && !hasUserOwnedImages()) userHasTakenControl = false;
+
+  if (!userHasTakenControl && !injectionInProgress) {
+    window.searchFeature?.clearImages('carousel');
+    lastInjectedSlideId = null;
+  }
+
+  // ✅ IMPORTANT: do NOT setUserActive(true) here (breaks typewriter path)
+  pauseRotation();
+
+  snapToAbsoluteIndex(absIndex);
+}
+
+// ===== NAVIGATION =====
+function smoothSnapTo(targetOffset) {
+  if (snapRaf) cancelAnimationFrame(snapRaf);
+  isSnapping = true;
+  setMode('snapping');
+
+  if (typewriterInterval) {
+    clearInterval(typewriterInterval);
+    typewriterInterval = null;
+  }
+  typewriterIndex = 0;
+  typewriterTargetPrompt = '';
+
+  // Clear prompt immediately only when truly in "auto" context
+  if (window.searchFeature && !isUserActive && !userHasTakenControl) {
+    window.searchFeature.setPrompt('', true);
+  }
+
+  const start = performance.now(), from = currentOffset, delta = targetOffset - from;
+
+  const tick = (now) => {
+    const k = Math.min(1, (now - start) / SNAP_DURATION);
+
+    let e;
+    if (k === 1) e = 1;
+    else if (k < 0.7) e = 1 - Math.pow(2, -12 * k);
+    else {
+      const t = (k - 0.7) / 0.3;
+      const base = 1 - Math.pow(2, -12 * 0.7);
+      e = base + (1 - base) * (1 - Math.pow(1 - t, 3));
+    }
+
+    currentOffset = from + delta * e;
+    requestUpdate();
+
+    if (k < 1) {
+      snapRaf = requestAnimationFrame(tick);
+    } else {
+      currentOffset = targetOffset;
+      requestUpdate();
+
+      // ✅ Always update prompt after snap.
+      // ✅ Also allow typewriter to run after click navigation.
+      requestAnimationFrame(() => {
+        isSnapping = false;
+
+        const active = document.activeElement;
+        const inputFocused = active && active.id === 'textArea';
+
+        if (!inputFocused && !userHasTakenControl) {
+          // enable typewriter branch in updatePrompt()
+          isUserActive = false;
         }
 
-        // Helper function to get current active slide data
-        function getActiveSlideData() {
-            const originalIndex = ((activeIndex - originalSlideCount) % originalSlideCount + originalSlideCount) % originalSlideCount;
-            const activeSlide = slideElements[activeIndex];
-            return getSlideData(activeSlide);
+        updatePrompt();
+      });
+    }
+  };
+
+  snapRaf = requestAnimationFrame(tick);
+}
+
+function nextSlide() {
+  injectToken++;
+  stopTypewriter();
+  if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
+  if (!isUserActive && !hasUserOwnedImages()) userHasTakenControl = false;
+  if (!userHasTakenControl && !injectionInProgress) {
+    window.searchFeature?.clearImages('carousel');
+    lastInjectedSlideId = null;
+  }
+  smoothSnapTo(Math.round(currentOffset) + 1);
+}
+
+function prevSlide() {
+  injectToken++;
+  stopTypewriter();
+  if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
+  if (!isUserActive && !hasUserOwnedImages()) userHasTakenControl = false;
+  if (!userHasTakenControl && !injectionInProgress) {
+    window.searchFeature?.clearImages('carousel');
+    lastInjectedSlideId = null;
+  }
+  smoothSnapTo(Math.round(currentOffset) - 1);
+}
+
+function handleResize() {
+  const wasMobile = isMobile;
+  isMobile = window.innerWidth < 768;
+  if (wasMobile !== isMobile) {
+    isFocusZoomed = false;
+    const keep = Math.round(currentOffset);
+    initCarousel();
+    currentOffset = keep;
+    requestUpdate();
+    const track = q('slider-track');
+    if (track) track.style.cursor = isMobile ? '' : 'pointer';
+  } else {
+    requestUpdate();
+  }
+}
+
+// ===== AUTO-ROTATION =====
+function startRotation(slideImmediately = false) {
+  if (autoInterval || isUserActive) return;
+
+  if (slideImmediately && !isUserActive && !isSnapping && !isDragging) {
+    setMode('auto');
+    smoothSnapTo(Math.round(currentOffset) + 1);
+  }
+
+  autoInterval = setInterval(() => {
+    if (!isUserActive && !isSnapping && !isDragging) {
+      setMode('auto');
+      smoothSnapTo(Math.round(currentOffset) + 1);
+    }
+  }, ROTATION_DELAY);
+}
+
+function pauseRotation() {
+  if (autoInterval) {
+    clearInterval(autoInterval);
+    autoInterval = null;
+  }
+}
+
+function setUserActive(active) {
+  isUserActive = active;
+  if (active) pauseRotation();
+  else setTimeout(() => {
+    if (!isUserActive && !isDragging && !userHasTakenControl && !hasUserOwnedImages()) startRotation();
+  }, 20);
+}
+
+// ===== PROMPT MANAGEMENT =====
+function stopTypewriter() {
+  const wasTyping = typewriterInterval !== null;
+  const fullPrompt = typewriterTargetPrompt;
+
+  if (wasTyping && fullPrompt && window.searchFeature) {
+    window.searchFeature.setPrompt(fullPrompt);
+  }
+
+  if (typewriterInterval) {
+    clearInterval(typewriterInterval);
+    typewriterInterval = null;
+  }
+  typewriterIndex = 0;
+  typewriterTargetPrompt = '';
+}
+
+function startTypewriter(fullPrompt) {
+  stopTypewriter();
+  if (!window.searchFeature || !fullPrompt) return;
+
+  typewriterTargetPrompt = fullPrompt;
+  typewriterIndex = 0;
+
+  if (window.searchFeature?.setTypewriterActive) {
+    window.searchFeature.setTypewriterActive(true);
+  }
+
+  window.searchFeature.setPrompt('');
+
+  typewriterInterval = setInterval(() => {
+    if (typewriterIndex >= typewriterTargetPrompt.length) {
+      stopTypewriter();
+      setTimeout(() => {
+        const textArea = q('textArea');
+        if (textArea) {
+          textArea.scrollTo({ top: textArea.scrollHeight, behavior: 'smooth' });
+        }
+      }, 5000);
+      return;
+    }
+
+    typewriterIndex++;
+    const currentText = typewriterTargetPrompt.substring(0, typewriterIndex);
+    window.searchFeature.setPrompt(currentText, true);
+  }, 30);
+}
+
+function updatePrompt() {
+  if (!window.searchFeature) return;
+  const active = document.activeElement;
+
+  if (active && active.id === 'textArea') return;
+  if (isSnapping) return;
+
+  const currentSlide = getCurrentSlide();
+  const fullPrompt = prompts[currentSlide.label];
+  if (!fullPrompt) return;
+
+  storedPrompt = fullPrompt;
+
+  if (!isUserActive && !userHasTakenControl) {
+    startTypewriter(fullPrompt);
+  } else {
+    stopTypewriter();
+    window.searchFeature.setPrompt(fullPrompt);
+  }
+}
+
+function expandPrompt() {
+  stopTypewriter();
+  if (!storedPrompt) return;
+  window.searchFeature?.setPrompt(storedPrompt);
+}
+
+function handleUserInput(value) {
+  if (!storedPrompt || userHasTakenControl) return;
+  if (value !== undefined && value.length > 0 && value !== storedPrompt) {
+    userHasTakenControl = true;
+    stopTypewriter();
+  }
+}
+
+// ===== IMAGE INTEGRATION =====
+async function addCurrentSlideImage() {
+  const currentSlide = getCurrentSlide();
+  const imageUrl = (currentSlide?.injectUrl || '').trim();
+  if (!imageUrl) return;
+
+  const slideKey = currentSlide.label.toLowerCase().replace(/\s+/g, '-');
+  if (hasCarouselImage(imageUrl, slideKey)) return;
+  if (injectionInProgress || lastInjectedSlideId === currentSlide.id) return;
+
+  injectionInProgress = true;
+  lastInjectedSlideId = currentSlide.id;
+
+  try {
+    await window.searchFeature?.setExternalImage(imageUrl, slideKey);
+    const addBtn = q('addButton');
+    if (addBtn) { addBtn.disabled = false; addBtn.ariaDisabled = 'false'; }
+    scheduleSyncBackend();
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } finally {
+    injectionInProgress = false;
+  }
+}
+
+// ===== EVENTS =====
+function setupEventHandlers() {
+  const textArea = q('textArea');
+
+  if (textArea) {
+    textArea.addEventListener('focus', () => {
+      setUserActive(true);
+      pauseRotation();
+
+      const userHasOwnImage = hasUserOwnedImages();
+      isFocusZoomed = !isMobile && !userHasOwnImage;
+      requestUpdate();
+
+      if (!userHasTakenControl) {
+        expandPrompt();
+        if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
+
+        const slideIdAtFocus = getCurrentSlide()?.id;
+        const myToken = ++injectToken;
+
+        pendingInjectTimeout = setTimeout(() => {
+          if (myToken !== injectToken || getCurrentSlide()?.id !== slideIdAtFocus) return;
+          const userHasImgs = hasUserOwnedImages();
+          const anyThumbs = getUIImageURLs().length > 0;
+          if (!userHasImgs && !anyThumbs) addCurrentSlideImage();
+          requestUpdate();
+        }, 80);
+      }
+    });
+
+    textArea.addEventListener('blur', (e) => {
+      if (suppressNextBlur) return;
+      const container = q('searchContainer'), addBtn = q('addButton'), genBtn = q('generateButton');
+      const rt = e.relatedTarget;
+      const focusStayedInside = (rt && container && isInside(container, rt)) ||
+        (rt && addBtn && isInside(addBtn, rt)) || (rt && genBtn && isInside(genBtn, rt));
+
+      if (!focusStayedInside) {
+        isUserActive = false;
+
+        const currentPrompt = window.searchFeature?.getLivePrompt?.() || '';
+        if (!currentPrompt.trim() && !hasUserOwnedImages()) {
+          userHasTakenControl = false;
         }
 
-        // Smooothy-inspired lerp and damp functions
-        const lerp = (start, end, factor) => start + (end - start) * factor;
+        const userHasOwnImage = hasUserOwnedImages();
+        isFocusZoomed = !isMobile && !userHasTakenControl && !userHasOwnImage;
+        requestUpdate();
 
-        const damp = (current, target, smoothing, deltaTime) => {
-            return lerp(current, target, 1 - Math.exp(-smoothing * deltaTime));
-        };
+        injectToken++;
+        if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
 
-        // Detect if device is mobile
-        const isMobile = window.innerWidth <= 768;
-
-        // Configuration
-        const CONFIG = {
-            minOpacity: isMobile ? 0.1 : 1,
-            maxOpacity: 1.0,
-            minScale: 0.7,
-            maxScale: 1.0,
-            scaleDistance: 2,
-            slideSpacing: 320, // Spacing between slide centers
-            animationDuration: 0.9,
-            animationEasing: 'ease', // Smooth easing instead of bounce
-            // Different dimensions for active vs inactive
-            inactiveWidth: 328,
-            inactiveHeight: 437,
-            activeWidth: isMobile ? 378 : 748,
-            activeHeight: 437,
-            // Autoplay settings
-            autoplayEnabled: true,
-            autoplayDelay: 3000, // 3 seconds between slides
-            // Momentum physics settings
-            momentumEnabled: true,
-            momentumFriction: 0.78,        // Higher = slides further (0-1)
-            momentumMinVelocity: 0.25,      // Minimum speed to trigger momentum (px/ms)
-            // Smooothy-inspired smooth settling
-            lerpFactor: 0.2,               // Smoothness for settling (0.1-0.3)
-            snapLerpFactor: 0.55,           // Faster snap for responsive feel (0.15-0.25)
-            useSmoothSettling: false,        // Enable smooth lerp-based settling
-        };
-
-        let activeIndex = 0;
-        const slideElements = [];
-        let originalSlideCount = 0; // Will be set after reading HTML slides
-
-        // Drag state
-        let isDragging = false;
-        let isMomentum = false; // Track momentum phase separately
-        let isTransitioning = false; // Prevent navigation during loop reset
-        let isSettling = false; // Track smooth settling phase
-        let dragStartX = 0;
-        let dragCurrentX = 0;
-        let dragStartTime = 0;
-        let lastDragX = 0;      // Track for velocity calculation
-        let lastDragTime = 0;   // Track for velocity calculation
-
-        // Smooth settling state (Smooothy-inspired)
-        let targetSlideIndex = 0;
-        let settlingStartTime = 0;
-        let settlingAnimationFrame = null;
-
-        // Store current interpolated values for each slide
-        const slideStates = new Map(); // Map<slideElement, {x, opacity, width, height, marginLeft, marginTop}>
-
-        // Typewriter animation state
-        let typewriterTimeout = null;
-        let currentTypewriterPrompt = '';
-        let isTypewriterActive = false;
-        let userHasTakenControl = false; // Track if user has started typing
-        let injectedSlideKeys = new Set(); // Track which slides have had images injected
-
-        // Typewriter animation function
-        function typewriterEffect(text, speed = 30) {
-            // Don't start typewriter if user has taken control
-            if (userHasTakenControl) {
-                // Just set the full prompt directly without animation
-                currentTypewriterPrompt = text;
-                if (window.searchFeature?.setPrompt) {
-                    window.searchFeature.setPrompt(text, false);
-                }
-                return;
-            }
-
-            // Clear any existing typewriter animation
-            if (typewriterTimeout) {
-                clearTimeout(typewriterTimeout);
-                typewriterTimeout = null;
-            }
-
-            // Stop if text is empty or search feature not available
-            if (!text || !window.searchFeature?.setPrompt) return;
-
-            // Store the full prompt and mark typewriter as active
-            currentTypewriterPrompt = text;
-            isTypewriterActive = true;
-
-            // Notify prompt box that typewriter is active
-            if (window.searchFeature?.setTypewriterActive) {
-                window.searchFeature.setTypewriterActive(true);
-            }
-
-            let currentIndex = 0;
-
-            function typeNextChar() {
-                if (currentIndex <= text.length) {
-                    const currentText = text.substring(0, currentIndex);
-                    window.searchFeature.setPrompt(currentText, true); // true = isTypewriter
-                    currentIndex++;
-                    typewriterTimeout = setTimeout(typeNextChar, speed);
-                } else {
-                    // Typewriter complete
-                    isTypewriterActive = false;
-                    if (window.searchFeature?.setTypewriterActive) {
-                        window.searchFeature.setTypewriterActive(false);
-                    }
-                }
-            }
-
-            // Start with empty and begin typing
-            window.searchFeature.setPrompt('', true);
-            typeNextChar();
+        if (!userHasTakenControl && !injectionInProgress) {
+          window.searchFeature?.clearImages('carousel');
+          lastInjectedSlideId = null;
         }
 
-        // Stop typewriter animation
-        function stopTypewriter() {
-            if (typewriterTimeout) {
-                clearTimeout(typewriterTimeout);
-                typewriterTimeout = null;
-            }
-            isTypewriterActive = false;
-            if (window.searchFeature?.setTypewriterActive) {
-                window.searchFeature.setTypewriterActive(false);
-            }
-        }
-
-        // Get full prompt for typewriter (used by prompt box)
-        function getFullPrompt() {
-            return currentTypewriterPrompt;
-        }
-
-        // Mark that user has taken control (called when user types in prompt box)
-        function markUserControl() {
-            console.log('[CAROUSEL] User has taken control');
-            userHasTakenControl = true;
-            stopTypewriter();
-            pauseAutoplay();
-        }
-
-        // Reset user control (called when prompt box is cleared or reset)
-        function resetUserControl() {
-            console.log('[CAROUSEL] Resetting user control');
-            userHasTakenControl = false;
-            resumeAutoplay();
-        }
-
-        // Interpolation functions
-        function getScale(distance) {
-            const absDistance = Math.abs(distance);
-            if (absDistance === 0) return CONFIG.maxScale;
-
-            const factor = Math.min(absDistance / CONFIG.scaleDistance, 1);
-            return CONFIG.maxScale - (CONFIG.maxScale - CONFIG.minScale) * factor;
-        }
-
-        function getOpacity(distance) {
-            const absDistance = Math.abs(distance);
-            if (absDistance === 0) return CONFIG.maxOpacity;
-
-            const factor = Math.min(absDistance / CONFIG.scaleDistance, 1);
-            return CONFIG.maxOpacity - (CONFIG.maxOpacity - CONFIG.minOpacity) * factor;
-        }
-
-        function getXPosition(distance) {
-            return distance * CONFIG.slideSpacing;
-        }
-
-        // Calculate dynamic X position maintaining constant gaps
-        function getXPositionDynamic(index, activeIndex, dragging = false, dragStartActive = activeIndex) {
-            const gap = 12; // Constant edge-to-edge gap between ALL slides
-
-            if (index === activeIndex) {
-                return 0;
-            }
-
-            // Calculate cumulative position by walking from active to target
-            let position = 0;
-
-            if (index < activeIndex) {
-                // Walking left from active
-                for (let i = activeIndex - 1; i >= index; i--) {
-                    let currentWidth, nextWidth;
-
-                    if (dragging) {
-                        // During drag: the drag-start active slide stays large
-                        currentWidth = i === dragStartActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                        nextWidth = (i + 1) === dragStartActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                    } else {
-                        // Current slide (i) and next slide (i+1 which is closer to active)
-                        currentWidth = i === activeIndex ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                        nextWidth = (i + 1) === activeIndex ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                    }
-
-                    position -= (nextWidth / 2) + gap + (currentWidth / 2);
-                }
-            } else {
-                // Walking right from active
-                for (let i = activeIndex + 1; i <= index; i++) {
-                    let currentWidth, prevWidth;
-
-                    if (dragging) {
-                        // During drag: the drag-start active slide stays large
-                        currentWidth = i === dragStartActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                        prevWidth = (i - 1) === dragStartActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                    } else {
-                        // Current slide (i) and previous slide (i-1 which is closer to active)
-                        currentWidth = i === activeIndex ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                        prevWidth = (i - 1) === activeIndex ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                    }
-
-                    position += (prevWidth / 2) + gap + (currentWidth / 2);
-                }
-            }
-
-            return position;
-        }
-
-        function getZIndex(distance) {
-            return 100 - Math.abs(Math.round(distance * 10));
-        }
-
-        // Update all slide positions with optional drag offset
-        function updateSlidePositions(newActiveIndex, dragOffset = 0) {
-            // PERFORMANCE: Batch DOM reads first, then writes
-            const positions = [];
-
-            // READ phase - gather all calculations
-            slideElements.forEach((slide, index) => {
-                const distance = index - newActiveIndex;
-                let isActive;
-                if (isDragging) {
-                    isActive = index === dragStartActiveIndex;
-                } else {
-                    isActive = distance === 0;
-                }
-
-                const baseX = getXPositionDynamic(index, newActiveIndex, isDragging, dragStartActiveIndex);
-                const x = baseX + dragOffset;
-                const opacity = getOpacity(distance);
-                const zIndex = getZIndex(distance);
-                const width = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                const height = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
-
-                positions.push({ slide, index, distance, isActive, x, opacity, zIndex, width, height });
-            });
-
-            // WRITE phase - apply all changes
-            positions.forEach(({ slide, isActive, x, opacity, zIndex, width, height }) => {
-                slide.style.zIndex = zIndex.toString();
-
-                // PERFORMANCE: Add will-change hint for actively transitioning slides
-                const shouldAnimatePosition = !isDragging && !isMomentum;
-                if (shouldAnimatePosition) {
-                    slide.style.willChange = 'transform, opacity, width, height';
-                } else {
-                    slide.style.willChange = 'auto';
-                }
-
-                const positionOptions = shouldAnimatePosition ? {
-                    duration: CONFIG.animationDuration * 0.6,
-                    easing: CONFIG.animationEasing,
-                } : {
-                    duration: 0,
-                    easing: 'linear',
-                };
-
-                // Always update position
-                animate(slide, {
-                    x,
-                    opacity
-                }, positionOptions);
-
-                // Size: only animate when NOT dragging/momentum
-                if (!isDragging && !isMomentum) {
-                    const sizeOptions = {
-                        duration: CONFIG.animationDuration * 0.6,
-                        easing: CONFIG.animationEasing,
-                    };
-
-                    animate(
-                        slide,
-                        {
-                            width: `${width}px`,
-                            height: `${height}px`,
-                            marginLeft: `${-width / 2}px`,
-                            marginTop: `${-height / 2}px`,
-                        },
-                        sizeOptions
-                    );
-                }
-            });
-
-            // Update UI only if not dragging
-            if (!isDragging) {
-                updateControls(newActiveIndex);
-            }
-        }
-
-        // Update controls state
-        function updateControls(index) {
-            activeIndex = index;
-
-            // Calculate the original slide index (accounting for clones)
-            const originalIndex = ((index - originalSlideCount) % originalSlideCount + originalSlideCount) % originalSlideCount;
-
-            // Never disable buttons in infinite loop
-            document.getElementById('prevBtn').disabled = false;
-            document.getElementById('nextBtn').disabled = false;
-
-            // Update indicators based on original index
-            document.querySelectorAll('.indicator').forEach((indicator, i) => {
-                indicator.classList.toggle('active', i === originalIndex);
-            });
-
-            // Get and log active slide data (for debugging/integration purposes)
-            const slideData = getActiveSlideData();
-            console.log('Active Slide:', slideData);
-
-            // Clear carousel-injected images when slide changes in demo mode
-            if (!userHasTakenControl && window.searchFeature?.clearImages) {
-                console.log('[CAROUSEL] Demo mode - clearing carousel images for new slide');
-                window.searchFeature.clearImages('carousel');
-            }
-
-            // Update prompt box with active slide's prompt using typewriter animation
-            if (slideData.prompt && window.searchFeature?.setPrompt) {
-                typewriterEffect(slideData.prompt, 30); // 30ms per character
-            }
-
-            // Update debug with original index
-            const debugElement = document.getElementById('debug');
-            if (debugElement) {
-                debugElement.textContent = `Active Index: ${originalIndex + 1} / ${originalSlideCount}`;
-            }
-        }
-
-        // Navigation
-        function goToSlide(index) {
-            if (isTransitioning) return; // Prevent navigation during reset only
-
-            // Cancel any ongoing settling animation
-            if (isSettling && settlingAnimationFrame) {
-                cancelAnimationFrame(settlingAnimationFrame);
-                isSettling = false;
-            }
-
-            activeIndex = index;
-            dragStartActiveIndex = index; // Keep in sync
-            targetSlideIndex = index;
-
-            if (CONFIG.useSmoothSettling) {
-                // Use smooth lerp-based settling for consistent animation
-                startSmoothSettling();
-            } else {
-                // Use Motion One animation (original behavior)
-                updateSlidePositions(activeIndex);
-
-                // BUG FIX: Reset position AFTER animation completes (not during)
-                // This prevents visible jumps during the animation
-                const isClone = (index < originalSlideCount) || (index >= originalSlideCount * 2);
-                if (isClone) {
-                    const animationDuration = CONFIG.animationDuration * 0.6 * 1000; // Convert to ms
-                    setTimeout(() => {
-                        checkAndResetLoopPosition();
-                    }, animationDuration);
-                }
-            }
-        }
-
-        // Check and reset loop position after animation completes
-        function checkAndResetLoopPosition() {
-            const isClone = (activeIndex < originalSlideCount) || (activeIndex >= originalSlideCount * 2);
-
-            if (!isClone || isDragging || isMomentum || isSettling || isTransitioning) {
-                return; // Not on a clone or actively moving
-            }
-
-            let newIndex;
-            if (activeIndex < originalSlideCount) {
-                // Going backward: clone → last original
-                newIndex = activeIndex + originalSlideCount;
-                console.log('[CAROUSEL] Seamless backward loop:', activeIndex, '→', newIndex);
-            } else {
-                // Going forward: clone → first original
-                newIndex = activeIndex - originalSlideCount;
-                console.log('[CAROUSEL] Seamless forward loop:', activeIndex, '→', newIndex);
-            }
-
-            // Block transitions during reset
-            isTransitioning = true;
-
-            // Update indices
-            activeIndex = newIndex;
-            dragStartActiveIndex = newIndex;
-            targetSlideIndex = newIndex;
-
-            // Instantly reposition all slides using Motion One (smoother than direct style manipulation)
-            slideElements.forEach((slide, slideIndex) => {
-                const distance = slideIndex - newIndex;
-                const isActive = distance === 0;
-                const baseX = getXPositionDynamic(slideIndex, newIndex, false);
-                const opacity = getOpacity(distance);
-                const width = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                const height = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
-                const zIndex = getZIndex(distance);
-
-                slide.style.zIndex = zIndex.toString();
-
-                // Use Motion One with duration 0 for instant, smooth repositioning
-                animate(
-                    slide,
-                    {
-                        x: baseX,
-                        opacity: opacity,
-                        width: `${width}px`,
-                        height: `${height}px`,
-                        marginLeft: `${-width / 2}px`,
-                        marginTop: `${-height / 2}px`,
-                    },
-                    { duration: 0 }
-                );
-            });
-
-            // Update indicators only (DON'T trigger typewriter or content changes)
-            const originalIndex = ((newIndex - originalSlideCount) % originalSlideCount + originalSlideCount) % originalSlideCount;
-            document.querySelectorAll('.indicator').forEach((indicator, i) => {
-                indicator.classList.toggle('active', i === originalIndex);
-            });
-
-            // Re-enable transitions
-            setTimeout(() => {
-                isTransitioning = false;
-            }, 50);
-        }
-
-        function goToPrev() {
-            stopTypewriter();
-
-            // Calculate target index
-            let targetIndex = activeIndex - 1;
-
-            // BUG FIX: If we would land on a clone, wrap to the equivalent original instead
-            if (targetIndex < originalSlideCount) {
-                // Would land on clone before → jump to last original
-                targetIndex = targetIndex + originalSlideCount;
-                console.log('[CAROUSEL] Button prev wrap: avoiding clone, jumping to', targetIndex);
-            }
-
-            goToSlide(targetIndex);
-        }
-
-        function goToNext() {
-            stopTypewriter();
-
-            // Calculate target index
-            let targetIndex = activeIndex + 1;
-
-            // BUG FIX: If we would land on a clone, wrap to the equivalent original instead
-            if (targetIndex >= originalSlideCount * 2) {
-                // Would land on clone after → jump to first original
-                targetIndex = targetIndex - originalSlideCount;
-                console.log('[CAROUSEL] Button next wrap: avoiding clone, jumping to', targetIndex);
-            }
-
-            goToSlide(targetIndex);
-        }
-
-        // Track the slide that was active when drag started
-        let dragStartActiveIndex = activeIndex;
-
-        // Autoplay state
-        let autoplayTimer = null;
-        let isAutoplayPaused = false;
-
-        // Autoplay functions
-        function startAutoplay() {
-            if (!CONFIG.autoplayEnabled) return;
-
-            stopAutoplay(); // Clear any existing timer
-
-            if (!isAutoplayPaused) {
-                autoplayTimer = setInterval(() => {
-                    goToNext();
-                }, CONFIG.autoplayDelay);
-            }
-        }
-
-        function stopAutoplay() {
-            if (autoplayTimer) {
-                clearInterval(autoplayTimer);
-                autoplayTimer = null;
-            }
-        }
-
-        function pauseAutoplay() {
-            isAutoplayPaused = true;
-            stopAutoplay();
-        }
-
-        function resumeAutoplay() {
-            isAutoplayPaused = false;
-            startAutoplay();
-        }
-
-        // Drag handlers
-        function handleDragStart(e) {
-            // Don't start new drag while momentum is active
-            if (isMomentum) return;
-
-            isDragging = true;
-            dragStartActiveIndex = activeIndex; // Remember which slide was active
-            dragStartX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-            dragCurrentX = dragStartX;
-            dragStartTime = Date.now();
-            lastDragX = dragStartX;
-            lastDragTime = dragStartTime;
-
-            document.body.style.cursor = 'grabbing';
-
-            // Stop typewriter when user starts dragging
-            stopTypewriter();
-
-            // Pause autoplay when user interacts
-            pauseAutoplay();
-        }
-
-        function handleDragMove(e) {
-            if (!isDragging) return;
-
-            e.preventDefault();
-
-            const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
-            const currentTime = Date.now();
-
-            dragCurrentX = currentX;
-
-            // Update velocity tracking (keep last position from 100ms ago for better velocity calculation)
-            if (currentTime - lastDragTime > 100) {
-                lastDragX = currentX;
-                lastDragTime = currentTime;
-            }
-
-            const dragOffset = currentX - dragStartX;
-
-            // Update slide states during drag for smooth transition to settling
-            slideElements.forEach((slide, index) => {
-                const distance = index - activeIndex;
-                const isActive = index === dragStartActiveIndex;
-                const baseX = getXPositionDynamic(index, activeIndex, true, dragStartActiveIndex);
-                const x = baseX + dragOffset;
-                const width = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                const height = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
-                const opacity = getOpacity(distance);
-
-                // Update slide state for smooth settling later
-                slideStates.set(slide, {
-                    x: x,
-                    opacity: opacity,
-                    width: width,
-                    height: height,
-                    marginLeft: -width / 2,
-                    marginTop: -height / 2,
-                });
-            });
-
-            // Update positions with drag offset
-            updateSlidePositions(activeIndex, dragOffset);
-        }
-
-        function handleDragEnd(e) {
-            if (!isDragging) return;
-
-            document.body.style.cursor = '';
-
-            const dragOffset = dragCurrentX - dragStartX;
-            const timeSinceLastUpdate = Date.now() - lastDragTime;
-
-            // Calculate velocity (px per ms) over the tracked period
-            const velocity = (dragCurrentX - lastDragX) / Math.max(timeSinceLastUpdate, 1);
-
-            if (CONFIG.momentumEnabled && Math.abs(velocity) > CONFIG.momentumMinVelocity) {
-                // Apply momentum physics - keep isDragging true during momentum
-                isMomentum = true;
-                applyMomentum(velocity, dragOffset);
-            } else {
-                // No momentum - just snap to nearest
-                isDragging = false;
-                snapToNearest(dragOffset);
-            }
-        }
-
-        // Apply momentum-based sliding with friction
-        function applyMomentum(initialVelocity, currentOffset) {
-            let velocity = initialVelocity;
-            let offset = currentOffset;
-            let animationFrame;
-
-            const momentumStep = () => {
-                // Apply friction - reduces velocity each frame
-                velocity *= CONFIG.momentumFriction;
-
-                // Update offset based on velocity (assuming ~60fps)
-                offset += velocity * 16; // 16ms per frame
-
-                // Calculate which slide would be closest with this offset
-                let potentialNearestIndex = dragStartActiveIndex;
-                let minDistance = Infinity;
-
-                for (let i = 0; i < slideElements.length; i++) {
-                    const basePosition = getXPositionDynamic(i, activeIndex, true, dragStartActiveIndex);
-                    const slidePosition = basePosition + offset;
-                    const absDistance = Math.abs(slidePosition);
-
-                    if (absDistance < minDistance) {
-                        minDistance = absDistance;
-                        potentialNearestIndex = i;
-                    }
-                }
-
-                // Check if we're about to overshoot into clone territory
-                const wouldOvershoot = potentialNearestIndex < originalSlideCount ||
-                    potentialNearestIndex >= originalSlideCount * 2;
-
-                // Continue if velocity is significant
-                if (Math.abs(velocity) > CONFIG.momentumMinVelocity) {
-                    // Update positions during momentum (still in "dragging" mode)
-                    updateSlidePositions(activeIndex, offset);
-                    animationFrame = requestAnimationFrame(momentumStep);
-                } else {
-                    // Momentum finished - transition to smooth settling
-                    isDragging = false;
-                    isMomentum = false;
-
-                    // Find nearest and use smooth settling
-                    let nearestIndex = dragStartActiveIndex;
-                    let minDist = Infinity;
-
-                    for (let i = 0; i < slideElements.length; i++) {
-                        const basePosition = getXPositionDynamic(i, dragStartActiveIndex, true, dragStartActiveIndex);
-                        const slidePosition = basePosition + offset;
-                        const absDistance = Math.abs(slidePosition);
-
-                        // Add a small bias for the original slides to prevent flickering at loop points
-                        const bias = (i >= originalSlideCount && i < originalSlideCount * 2) ? 0.95 : 1.0;
-                        const biasedDistance = absDistance * bias;
-
-                        if (biasedDistance < minDist) {
-                            minDist = biasedDistance;
-                            nearestIndex = i;
-                        }
-                    }
-
-                    targetSlideIndex = nearestIndex;
-                    activeIndex = nearestIndex;
-                    dragStartActiveIndex = nearestIndex;
-
-                    if (CONFIG.useSmoothSettling) {
-                        startSmoothSettling();
-                    } else {
-                        updateSlidePositions(nearestIndex);
-
-                        // Resume autoplay if user hasn't taken control
-                        if (!userHasTakenControl) {
-                            resumeAutoplay();
-                        }
-
-                        // BUG FIX: Reset position AFTER animation completes
-                        const isClone = (nearestIndex < originalSlideCount) || (nearestIndex >= originalSlideCount * 2);
-                        if (isClone) {
-                            const animationDuration = CONFIG.animationDuration * 0.6 * 1000; // Convert to ms
-                            setTimeout(() => {
-                                checkAndResetLoopPosition();
-                            }, animationDuration);
-                        }
-                    }
-                }
-            };
-
-            animationFrame = requestAnimationFrame(momentumStep);
-        }
-
-        // Snap to nearest slide without momentum
-        function snapToNearest(dragOffset) {
-            // Calculate which slide is now closest to center
-            let nearestIndex = activeIndex;
-            let minDistance = Infinity;
-
-            for (let i = 0; i < slideElements.length; i++) {
-                const basePosition = getXPositionDynamic(i, activeIndex, true, dragStartActiveIndex);
-                const slidePosition = basePosition + dragOffset;
-                const absDistance = Math.abs(slidePosition);
-
-                // Add a small bias for the original slides (middle set) to prevent picking clones prematurely
-                const bias = (i >= originalSlideCount && i < originalSlideCount * 2) ? 0.95 : 1.0;
-                const biasedDistance = absDistance * bias;
-
-                if (biasedDistance < minDistance) {
-                    minDistance = biasedDistance;
-                    nearestIndex = i;
-                }
-            }
-
-            // Update active index and reset drag start index
-            targetSlideIndex = nearestIndex;
-            activeIndex = nearestIndex;
-            dragStartActiveIndex = nearestIndex; // IMPORTANT: Reset for next interaction
-
-            if (CONFIG.useSmoothSettling) {
-                // Use smooth lerp-based settling (Smooothy-inspired)
-                startSmoothSettling();
-            } else {
-                // Use Motion One animation (original behavior)
-                updateSlidePositions(nearestIndex);
-
-                // Resume autoplay if user hasn't taken control
+        setTimeout(() => {
+          if (!isUserActive && !isDragging && !userHasTakenControl && !hasUserOwnedImages()) {
+            startRotation(true);
+          }
+        }, 20);
+      }
+    });
+
+    textArea.addEventListener('input', (e) => handleUserInput(e.target.value));
+    textArea.addEventListener('click', () => {
+      setUserActive(true);
+      pauseRotation();
+
+      if (!userHasTakenControl) {
+        expandPrompt();
+        if (hasUserOwnedImages()) return;
+        injectToken++;
+        if (pendingInjectTimeout) { clearTimeout(pendingInjectTimeout); pendingInjectTimeout = null; }
+        addCurrentSlideImage();
+      }
+    });
+  }
+
+  [q('addButton'), q('generateButton')].filter(Boolean).forEach(button => {
+    button.setAttribute('tabindex', '0');
+    button.addEventListener('click', () => {
+      setUserActive(true);
+      pauseRotation();
+      setTimeout(() => setUserActive(false), 3000);
+    });
+  });
+
+  const searchContainer = q('searchContainer');
+  if (searchContainer) {
+    searchContainer.addEventListener('mouseenter', () => { if (!isUserActive) pauseRotation(); });
+    searchContainer.addEventListener('mouseleave', () => {
+      if (!isUserActive) setTimeout(() => { if (!isUserActive) startRotation(); }, 500);
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (isUserActive) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setUserActive(true); prevSlide(); setTimeout(() => setUserActive(false), 1000); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); setUserActive(true); nextSlide(); setTimeout(() => setUserActive(false), 1000); }
+  });
+
+  window.addEventListener('resize', handleResize);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') scheduleSyncBackend();
+  });
+
+  const wheelSurface = q('slider-track');
+  if (wheelSurface) {
+    let wheelV = 0, wheelRAF = null, wheelAnimating = false, lastWheelTime = 0;
+    const WHEEL_SENSITIVITY = 0.0045;
+    const WHEEL_FRICTION = 0.94;
+    const WHEEL_MIN_V = 0.0015;
+    const WHEEL_TIMEOUT = 80;
+    const SNAP_THRESHOLD = 0.25;
+    let wheelTimeout = null;
+
+    wheelSurface.addEventListener('wheel', (e) => {
+      if (!MANUAL_SCROLL) return;
+      if (userHasTakenControl) return;
+
+      const absX = Math.abs(e.deltaX), absY = Math.abs(e.deltaY);
+      const horizontalIntent = absX > absY * 1.2 || (absX > 0 && absY === 0);
+      const useShiftAsHorizontal = e.shiftKey && absX < absY;
+
+      if (window.searchFeature?.isInputFocused?.()) return;
+      if (!horizontalIntent && !useShiftAsHorizontal) return;
+
+      e.preventDefault();
+      setUserActive(true);
+
+      if (isFocusZoomed) isFocusZoomed = false;
+      setMode('user');
+
+      lastWheelTime = performance.now();
+
+      if (wheelTimeout) { clearTimeout(wheelTimeout); wheelTimeout = null; }
+      if (isSnapping && snapRaf) { cancelAnimationFrame(snapRaf); snapRaf = null; isSnapping = false; }
+
+      const dx = useShiftAsHorizontal ? e.deltaY : e.deltaX;
+      if (!dx) return;
+
+      wheelV = dx * WHEEL_SENSITIVITY;
+
+      if (!wheelAnimating) {
+        wheelAnimating = true;
+        const step = () => {
+          currentOffset += wheelV;
+          requestUpdate();
+          wheelV *= WHEEL_FRICTION;
+
+          if (Math.abs(wheelV) < WHEEL_MIN_V) {
+            wheelAnimating = false;
+            const nearest = Math.round(currentOffset);
+            if (Math.abs(currentOffset - nearest) < SNAP_THRESHOLD || performance.now() - lastWheelTime > WHEEL_TIMEOUT) {
+              smoothSnapTo(nearest);
+              setTimeout(() => {
+                setUserActive(false);
                 if (!userHasTakenControl) {
-                    resumeAutoplay();
+                  isFocusZoomed = !isMobile;
+                  requestUpdate();
                 }
-
-                // BUG FIX: Reset position AFTER animation completes
-                const isClone = (nearestIndex < originalSlideCount) || (nearestIndex >= originalSlideCount * 2);
-                if (isClone) {
-                    const animationDuration = CONFIG.animationDuration * 0.6 * 1000; // Convert to ms
-                    setTimeout(() => {
-                        checkAndResetLoopPosition();
-                    }, animationDuration);
-                }
+              }, SNAP_DURATION);
+              return;
             }
-        }
-
-        // Smooth settling animation using RAF and lerp (Smooothy-inspired)
-        function startSmoothSettling() {
-            isSettling = true;
-            settlingStartTime = performance.now();
-            let lastTime = settlingStartTime;
-
-            // Initialize slide states from CURRENT positions (not target) to avoid jump
-            slideElements.forEach((slide, index) => {
-                // Get current computed transform values
-                const computedStyle = window.getComputedStyle(slide);
-                const transform = computedStyle.transform;
-
-                let currentX = 0;
-                if (transform && transform !== 'none') {
-                    const matrix = new DOMMatrix(transform);
-                    currentX = matrix.m41; // translateX value
-                }
-
-                const currentWidth = parseFloat(computedStyle.width) || CONFIG.inactiveWidth;
-                const currentHeight = parseFloat(computedStyle.height) || CONFIG.inactiveHeight;
-                const currentOpacity = parseFloat(computedStyle.opacity) || 1;
-
-                slideStates.set(slide, {
-                    x: currentX,
-                    opacity: currentOpacity,
-                    width: currentWidth,
-                    height: currentHeight,
-                    marginLeft: -currentWidth / 2,
-                    marginTop: -currentHeight / 2,
-                });
-            });
-
-            const settlingStep = (currentTime) => {
-                const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap at 100ms
-                lastTime = currentTime;
-
-                let allSettled = true;
-
-                slideElements.forEach((slide, index) => {
-                    const distance = index - targetSlideIndex;
-                    const isActive = distance === 0;
-
-                    // Calculate target values
-                    const targetX = getXPositionDynamic(index, targetSlideIndex, false);
-                    const targetOpacity = getOpacity(distance);
-                    const targetWidth = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                    const targetHeight = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
-                    const targetMarginLeft = -targetWidth / 2;
-                    const targetMarginTop = -targetHeight / 2;
-
-                    const state = slideStates.get(slide);
-
-                    // Use exponential damping for position (X) and size - smooth sliding and resizing
-                    const smoothing = 15 * CONFIG.snapLerpFactor;
-                    state.x = damp(state.x, targetX, smoothing, deltaTime);
-                    state.opacity = damp(state.opacity, targetOpacity, smoothing, deltaTime);
-
-                    // Also smooth the width/height to prevent overlap during size changes
-                    state.width = damp(state.width, targetWidth, smoothing, deltaTime);
-                    state.height = damp(state.height, targetHeight, smoothing, deltaTime);
-
-                    // Calculate margins directly from current width/height to maintain center anchor
-                    state.marginLeft = -state.width / 2;
-                    state.marginTop = -state.height / 2;
-
-                    // Apply interpolated values
-                    slide.style.transform = `translateX(${state.x}px) translateZ(0)`;
-                    slide.style.opacity = state.opacity.toString();
-                    slide.style.width = `${state.width}px`;
-                    slide.style.height = `${state.height}px`;
-                    slide.style.marginLeft = `${state.marginLeft}px`;
-                    slide.style.marginTop = `${state.marginTop}px`;
-
-                    // Check if position and size have settled
-                    const threshold = 1.5;
-                    if (
-                        Math.abs(state.x - targetX) > threshold ||
-                        Math.abs(state.width - targetWidth) > threshold
-                    ) {
-                        allSettled = false;
-                    }
-                });
-
-                if (!allSettled) {
-                    settlingAnimationFrame = requestAnimationFrame(settlingStep);
-                } else {
-                    // Settling complete
-                    isSettling = false;
-                    updateControls(targetSlideIndex);
-
-                    // Resume autoplay if user hasn't taken control
-                    if (!userHasTakenControl) {
-                        resumeAutoplay();
-                    }
-
-                    // BUG FIX: Reset position if we settled on a clone
-                    const isClone = (targetSlideIndex < originalSlideCount) || (targetSlideIndex >= originalSlideCount * 2);
-                    if (isClone) {
-                        // Reset immediately since settling is already complete
-                        checkAndResetLoopPosition();
-                    }
-                }
-            };
-
-            settlingAnimationFrame = requestAnimationFrame(settlingStep);
-        }
-
-        // Initialize slides
-        function init() {
-            const slidesContainer = document.getElementById('slides');
-            const indicatorsContainer = document.getElementById('indicators');
-
-            // Get all original slide elements from HTML
-            const originalSlides = Array.from(slidesContainer.querySelectorAll('.slide[data-slide-index]'));
-            originalSlideCount = originalSlides.length;
-
-            if (originalSlideCount === 0) {
-                console.error('No slides found in HTML!');
-                return;
-            }
-
-            // Clone slides for seamless infinite loop
-            // Structure: [...clones, ...original slides, ...clones]
-            const clonesBefore = originalSlides.map(slide => {
-                const clone = slide.cloneNode(true);
-                clone.removeAttribute('data-slide-index'); // Mark as clone
-                clone.setAttribute('data-clone', 'before');
-                return clone;
-            });
-
-            const clonesAfter = originalSlides.map(slide => {
-                const clone = slide.cloneNode(true);
-                clone.removeAttribute('data-slide-index'); // Mark as clone
-                clone.setAttribute('data-clone', 'after');
-                return clone;
-            });
-
-            // Clear container and rebuild with clones
-            slidesContainer.innerHTML = '';
-
-            // Add clones before
-            clonesBefore.forEach(clone => {
-                slidesContainer.appendChild(clone);
-                slideElements.push(clone);
-            });
-
-            // Add originals
-            originalSlides.forEach(slide => {
-                slidesContainer.appendChild(slide);
-                slideElements.push(slide);
-            });
-
-            // Add clones after
-            clonesAfter.forEach(clone => {
-                slidesContainer.appendChild(clone);
-                slideElements.push(clone);
-            });
-
-            // Add label tags to all slides
-            slideElements.forEach((slide) => {
-                // Get the label from data-label attribute
-                const label = slide.getAttribute('data-label');
-
-                if (label) {
-                    // Create tag container
-                    const tag = document.createElement('div');
-                    tag.className = 'slide-tag';
-                    tag.textContent = label;
-
-                    // Add tag to slide
-                    slide.appendChild(tag);
-                }
-            });
-
-            // Add click handlers to all slides (including clones)
-            slideElements.forEach((slide, index) => {
-                slide.addEventListener('click', (e) => {
-                    // Check if this was a drag (not a real click)
-                    const dragDistance = Math.abs(dragCurrentX - dragStartX);
-                    if (dragDistance <= 5) { // Only navigate if it's a real click
-                        stopTypewriter();
-
-                        // BUG FIX: Calculate shortest path to target (including wrap-around)
-                        // This makes click-to-center work like drag/autoplay with seamless wrapping
-
-                        // Normalize clicked index to its original equivalent
-                        let clickedOriginalIndex = index;
-                        if (index < originalSlideCount) {
-                            clickedOriginalIndex = index + originalSlideCount;
-                        } else if (index >= originalSlideCount * 2) {
-                            clickedOriginalIndex = index - originalSlideCount;
-                        }
-
-                        // Calculate which "version" of the target to navigate to (original, clone-before, or clone-after)
-                        // to achieve the shortest distance
-                        const currentIndex = activeIndex;
-
-                        // Get the original index value (0-8 for 9 slides)
-                        const targetOriginalValue = ((clickedOriginalIndex - originalSlideCount) % originalSlideCount + originalSlideCount) % originalSlideCount;
-
-                        // Calculate distances to all three versions of the target
-                        const targetInOriginals = originalSlideCount + targetOriginalValue; // Index in original slides
-                        const targetInClonesBefore = targetOriginalValue; // Index in clones before
-                        const targetInClonesAfter = (originalSlideCount * 2) + targetOriginalValue; // Index in clones after
-
-                        const distanceToOriginal = Math.abs(currentIndex - targetInOriginals);
-                        const distanceToBefore = Math.abs(currentIndex - targetInClonesBefore);
-                        const distanceToAfter = Math.abs(currentIndex - targetInClonesAfter);
-
-                        // Choose the version with shortest distance
-                        let bestTarget = targetInOriginals;
-                        let minDistance = distanceToOriginal;
-
-                        if (distanceToBefore < minDistance) {
-                            bestTarget = targetInClonesBefore;
-                            minDistance = distanceToBefore;
-                        }
-
-                        if (distanceToAfter < minDistance) {
-                            bestTarget = targetInClonesAfter;
-                        }
-
-                        console.log('[CAROUSEL] Click shortest path:', currentIndex, '→', bestTarget, 'to reach slide', targetOriginalValue);
-
-                        goToSlide(bestTarget);
-                    }
-                });
-            });
-
-            // Create indicators only for original slides (not clones)
-            for (let i = 0; i < originalSlideCount; i++) {
-                const indicator = document.createElement('button');
-                indicator.className = 'indicator';
-                indicator.textContent = (i + 1).toString();
-                indicator.addEventListener('click', () => {
-                    stopTypewriter();
-
-                    // BUG FIX: Use shortest path to target (same logic as slide clicks)
-                    const targetOriginalValue = i;
-                    const currentIndex = activeIndex;
-
-                    // Calculate distances to all three versions of the target
-                    const targetInOriginals = originalSlideCount + targetOriginalValue;
-                    const targetInClonesBefore = targetOriginalValue;
-                    const targetInClonesAfter = (originalSlideCount * 2) + targetOriginalValue;
-
-                    const distanceToOriginal = Math.abs(currentIndex - targetInOriginals);
-                    const distanceToBefore = Math.abs(currentIndex - targetInClonesBefore);
-                    const distanceToAfter = Math.abs(currentIndex - targetInClonesAfter);
-
-                    // Choose the version with shortest distance
-                    let bestTarget = targetInOriginals;
-                    let minDistance = distanceToOriginal;
-
-                    if (distanceToBefore < minDistance) {
-                        bestTarget = targetInClonesBefore;
-                        minDistance = distanceToBefore;
-                    }
-
-                    if (distanceToAfter < minDistance) {
-                        bestTarget = targetInClonesAfter;
-                    }
-
-                    console.log('[CAROUSEL] Indicator shortest path:', currentIndex, '→', bestTarget, 'for slide', targetOriginalValue);
-
-                    goToSlide(bestTarget);
-                });
-                indicatorsContainer.appendChild(indicator);
-            }
-
-            // Start at the first original slide (after the first set of clones)
-            activeIndex = originalSlideCount;
-            dragStartActiveIndex = activeIndex;
-
-            // Position all slides at their final positions with opacity 0
-            slideElements.forEach((slide, index) => {
-                const distance = index - activeIndex;
-                const isActive = distance === 0;
-                const baseX = getXPositionDynamic(index, activeIndex, false);
-                const width = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                const height = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
-                const zIndex = getZIndex(distance);
-
-                slide.style.zIndex = zIndex.toString();
-                slide.style.display = 'flex'; // Safari fix
-
-                // Directly set initial styles at final positions but invisible
-                slide.style.transform = `translateX(${baseX}px) translateZ(0)`;
-                slide.style.opacity = '0';
-                slide.style.width = `${width}px`;
-                slide.style.height = `${height}px`;
-                slide.style.marginLeft = `${-width / 2}px`;
-                slide.style.marginTop = `${-height / 2}px`;
-            });
-
-            // Fade in slides smoothly
-            // Use setTimeout to ensure initial styles are rendered first
-            setTimeout(() => {
-                slideElements.forEach((slide, index) => {
-                    const distance = index - activeIndex;
-                    const opacity = getOpacity(distance);
-
-                    // Only animate opacity - positions are already set
-                    animate(
-                        slide,
-                        {
-                            opacity: opacity,
-                        },
-                        {
-                            duration: 0.4,
-                            easing: 'ease-out'
-                        }
-                    );
-                });
-
-                updateControls(activeIndex);
-            }, 50);
-
-            // Add drag event listeners to viewport
-            const viewport = document.querySelector('.viewport');
-
-            // Mouse events
-            viewport.addEventListener('mousedown', handleDragStart);
-            document.addEventListener('mousemove', handleDragMove);
-            document.addEventListener('mouseup', handleDragEnd);
-
-            // Touch events
-            viewport.addEventListener('touchstart', handleDragStart, { passive: false });
-            document.addEventListener('touchmove', handleDragMove, { passive: false });
-            document.addEventListener('touchend', handleDragEnd);
-
-            // Hover events for autoplay
-            viewport.addEventListener('mouseenter', () => {
-                pauseAutoplay();
-            });
-
-            viewport.addEventListener('mouseleave', () => {
-                resumeAutoplay();
-            });
-        }
-
-        // Event listeners
-        document.getElementById('prevBtn').addEventListener('click', () => {
-            stopTypewriter();
-            goToPrev();
-        });
-
-        document.getElementById('nextBtn').addEventListener('click', () => {
-            stopTypewriter();
-            goToNext();
-        });
-
-
-        // Page Visibility API - pause slider when tab is not visible
-        function handleVisibilityChange() {
-            if (document.hidden) {
-                // Tab became hidden - pause everything
-                stopAutoplay();
-                stopTypewriter();
-
-                // Cancel any ongoing settling animation
-                if (isSettling && settlingAnimationFrame) {
-                    cancelAnimationFrame(settlingAnimationFrame);
-                    isSettling = false;
-                }
-
-                // Reset drag state to prevent broken state
-                isDragging = false;
-                isMomentum = false;
-                isTransitioning = false;
-            } else {
-                // Tab became visible - reset to current position and resume
-
-                // Force immediate positioning to prevent slides from being out of view
-                slideElements.forEach((slide, index) => {
-                    const distance = index - activeIndex;
-                    const isActive = distance === 0;
-                    const baseX = getXPositionDynamic(index, activeIndex, false);
-                    const opacity = getOpacity(distance);
-                    const width = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
-                    const height = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
-                    const zIndex = getZIndex(distance);
-
-                    // Use direct style manipulation for instant positioning
-                    slide.style.transform = `translateX(${baseX}px) translateZ(0)`;
-                    slide.style.opacity = opacity.toString();
-                    slide.style.width = `${width}px`;
-                    slide.style.height = `${height}px`;
-                    slide.style.marginLeft = `${-width / 2}px`;
-                    slide.style.marginTop = `${-height / 2}px`;
-                    slide.style.zIndex = zIndex.toString();
-                });
-
-                // Resume autoplay
-                resumeAutoplay();
-            }
-        }
-
-        // Listen for visibility changes
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Start
-        init();
-
-        // Monitor prompt box for user interactions
-        function setupPromptBoxMonitoring() {
-            const promptTextArea = document.getElementById('textArea');
-            const addButton = document.getElementById('addButton');
-            const generateButton = document.getElementById('generateButton');
-            const fileInput = document.getElementById('fileInput');
-
-            // Monitor focus on textarea - user is showing intent to interact
-            if (promptTextArea) {
-                promptTextArea.addEventListener('focus', () => {
-                    console.log('[CAROUSEL] Textarea focused - user taking control');
-
-                    // CRITICAL: Preserve current slide position
-                    const currentSlideBeforeFocus = activeIndex;
-                    console.log('[CAROUSEL] Current slide at focus:', currentSlideBeforeFocus);
-
-                    // If typewriter is active, show full prompt immediately
-                    if (isTypewriterActive && currentTypewriterPrompt) {
-                        console.log('[CAROUSEL] Stopping typewriter and showing full prompt');
-                        stopTypewriter();
-                        if (window.searchFeature?.setPrompt) {
-                            window.searchFeature.setPrompt(currentTypewriterPrompt, false);
-                        }
-                    }
-
-                    // Auto-inject sample image if user hasn't added images yet
-                    const slideData = getActiveSlideData();
-                    const slideKey = `slide-${slideData.id}`;
-
-                    // Check if user has uploaded any images
-                    const imagesSection = document.getElementById('imagesSection');
-                    const hasImages = imagesSection?.children?.length > 0;
-
-                    // Only inject if: no images exist, slide has injectUrl, and we haven't injected this slide before
-                    if (!hasImages && slideData.injectUrl && !injectedSlideKeys.has(slideKey)) {
-                        console.log('[CAROUSEL] Auto-injecting sample image for slide:', slideData.label);
-                        if (window.searchFeature?.setExternalImage) {
-                            window.searchFeature.setExternalImage(slideData.injectUrl, slideKey);
-                            injectedSlideKeys.add(slideKey);
-                        }
-                    }
-
-                    markUserControl();
-
-                    // VERIFY: Ensure slide position hasn't changed during focus
-                    if (activeIndex !== currentSlideBeforeFocus) {
-                        console.error('[CAROUSEL] BUG: Slide position changed during focus!',
-                            'Before:', currentSlideBeforeFocus, 'After:', activeIndex);
-                        // Force position back (defensive)
-                        activeIndex = currentSlideBeforeFocus;
-                        dragStartActiveIndex = currentSlideBeforeFocus;
-                        targetSlideIndex = currentSlideBeforeFocus;
-                    }
-                });
-
-                // Monitor blur/defocus - resume typewriter if user didn't type anything
-                promptTextArea.addEventListener('blur', () => {
-                    console.log('[CAROUSEL] Textarea blurred - checking if we should reset');
-
-                    // CRITICAL: Preserve current slide position
-                    const currentSlideBeforeBlur = activeIndex;
-                    console.log('[CAROUSEL] Current slide before blur:', currentSlideBeforeBlur);
-
-                    // Get current state
-                    const promptValue = promptTextArea.value || '';
-
-                    // Check if user actually modified the prompt
-                    // User didn't modify if: prompt is empty OR matches what carousel set
-                    const userDidNotModify = (promptValue.length === 0) || (promptValue === currentTypewriterPrompt);
-
-                    // OPTION A: User images lock the system in user mode
-                    // Check if user added their own images via API (primary method)
-                    let hasUserImages = false;
-
-                    if (window.searchFeature?.getImageCount) {
-                        const userImageCount = window.searchFeature.getImageCount('user');
-                        hasUserImages = userImageCount > 0;
-                        console.log('[CAROUSEL] User image count from API:', userImageCount);
-                    } else {
-                        console.warn('[CAROUSEL] getImageCount API not available - assuming no user images');
-                    }
-
-                    // Rule: If user has uploaded images, stay in user mode
-                    if (hasUserImages) {
-                        console.log('[CAROUSEL] User has uploaded images - staying in user mode (no auto-demo)');
-                        return; // Exit early - don't reset to demo mode
-                    }
-
-                    // If user didn't modify anything and has no user-added images, reset to demo mode
-                    if (userDidNotModify && !hasUserImages && userHasTakenControl) {
-                        console.log('[CAROUSEL] No modifications and no user images - resetting to demo mode');
-                        console.log('[CAROUSEL] PRESERVING slide position:', currentSlideBeforeBlur);
-
-                        // Clear any auto-injected carousel images
-                        if (window.searchFeature?.clearImages) {
-                            window.searchFeature.clearImages('carousel');
-                        }
-
-                        // Clear injected slide keys to allow re-injection
-                        injectedSlideKeys.clear();
-
-                        // Reset to demo mode WITHOUT changing carousel position
-                        resetUserControl();
-
-                        // VERIFY: Ensure slide position hasn't changed
-                        if (activeIndex !== currentSlideBeforeBlur) {
-                            console.error('[CAROUSEL] BUG: Slide position changed during blur!',
-                                'Before:', currentSlideBeforeBlur, 'After:', activeIndex);
-                            // Force position back (defensive)
-                            activeIndex = currentSlideBeforeBlur;
-                            dragStartActiveIndex = currentSlideBeforeBlur;
-                            targetSlideIndex = currentSlideBeforeBlur;
-                        } else {
-                            console.log('[CAROUSEL] ✓ Slide position preserved correctly');
-                        }
-
-                        // Don't re-trigger typewriter here - it will happen on next slide change
-                        // This allows the typing to restart naturally when updateControls is called
-                    }
-                });
-
-                // Monitor input changes
-                promptTextArea.addEventListener('input', (e) => {
-                    const currentValue = e.target.value;
-                    const hasValue = currentValue.length > 0;
-
-                    // User typed something - take control
-                    if (hasValue && !userHasTakenControl) {
-                        console.log('[CAROUSEL] User typed in textarea - taking control');
-                        markUserControl();
-                    }
-
-                    // BUG FIX: Deleting text is still user control - do NOT auto-reset
-                    // User clearing the prompt intentionally means they want it empty
-                    // Only the blur handler should check for returning to demo mode
-                });
-            }
-
-            // Monitor add button clicks
-            if (addButton) {
-                addButton.addEventListener('click', () => {
-                    const positionBeforeAction = activeIndex;
-                    console.log('[CAROUSEL] Add button clicked - user taking control');
-                    markUserControl();
-
-                    // Verify position preserved
-                    if (activeIndex !== positionBeforeAction) {
-                        console.error('[CAROUSEL] Position changed on add button!');
-                        activeIndex = positionBeforeAction;
-                        dragStartActiveIndex = positionBeforeAction;
-                        targetSlideIndex = positionBeforeAction;
-                    }
-                });
-            }
-
-            // Monitor file uploads
-            if (fileInput) {
-                fileInput.addEventListener('change', (e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                        const positionBeforeAction = activeIndex;
-                        console.log('[CAROUSEL] File uploaded - user taking control');
-                        markUserControl();
-
-                        // Verify position preserved
-                        if (activeIndex !== positionBeforeAction) {
-                            console.error('[CAROUSEL] Position changed on file upload!');
-                            activeIndex = positionBeforeAction;
-                            dragStartActiveIndex = positionBeforeAction;
-                            targetSlideIndex = positionBeforeAction;
-                        }
-                    }
-                });
-            }
-
-            // Monitor generate button clicks
-            if (generateButton) {
-                generateButton.addEventListener('click', () => {
-                    const positionBeforeAction = activeIndex;
-                    console.log('[CAROUSEL] Generate button clicked - user taking control');
-                    markUserControl();
-
-                    // Verify position preserved
-                    if (activeIndex !== positionBeforeAction) {
-                        console.error('[CAROUSEL] Position changed on generate button!');
-                        activeIndex = positionBeforeAction;
-                        dragStartActiveIndex = positionBeforeAction;
-                        targetSlideIndex = positionBeforeAction;
-                    }
-                });
-            }
-
-            // BUG FIX: Image removal observer removed
-            // Removing images is user action - doesn't trigger auto-reset to demo mode
-            // Only the blur handler should decide when to return to demo mode
-        }
-
-        // Setup monitoring after a brief delay to ensure DOM is ready
-        setTimeout(setupPromptBoxMonitoring, 100);
-
-        // Start autoplay
-        startAutoplay();
-
-        // Expose API for prompt box integration
-        window.aiPhotoCarousel = {
-            stopTypewriter,
-            getFullPrompt,
-            getStoredPrompt: getFullPrompt, // Alias for compatibility
-            getCurrentSlide: getActiveSlideData,
-            isTypewriting: () => isTypewriterActive,
-            markUserControl,
-            resetUserControl,
-            hasUserControl: () => userHasTakenControl
+          }
+          wheelRAF = requestAnimationFrame(step);
         };
+        wheelRAF = requestAnimationFrame(step);
+      }
+
+      wheelTimeout = setTimeout(() => {
+        if (wheelAnimating) {
+          wheelAnimating = false;
+          if (wheelRAF) { cancelAnimationFrame(wheelRAF); wheelRAF = null; }
+          smoothSnapTo(Math.round(currentOffset));
+          setTimeout(() => {
+            setUserActive(false);
+            if (!userHasTakenControl) {
+              isFocusZoomed = !isMobile;
+              requestUpdate();
+            }
+          }, SNAP_DURATION);
+        }
+      }, WHEEL_TIMEOUT);
+    }, { passive: false });
+
+    if (!isMobile) wheelSurface.style.cursor = userHasTakenControl ? 'default' : 'pointer';
+
+    // ✅ Drag disabled (desktop)
+    wheelSurface.addEventListener('pointerdown', () => {
+      return;
+    }, { passive: true });
+
+    // Mobile touch swipe remains unchanged (you can remove it too if you want)
+    if (isMobile) {
+      let touchStartY = 0, touchStartOffset = 0;
+      let isTouching = false, touchVelocity = 0, lastTouchY = 0, lastTouchTime = 0;
+
+      wheelSurface.addEventListener('touchstart', (e) => {
+        if (userHasTakenControl || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        touchStartY = touch.clientY;
+        touchStartOffset = currentOffset;
+        isTouching = true;
+
+        touchVelocity = 0;
+        lastTouchY = touchStartY;
+        lastTouchTime = performance.now();
+
+        if (!isUserActive) setUserActive(true);
+        if (isSnapping && snapRaf) { cancelAnimationFrame(snapRaf); snapRaf = null; isSnapping = false; }
+
+        setMode('user');
+      }, { passive: true });
+
+      wheelSurface.addEventListener('touchmove', (e) => {
+        if (!isTouching || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const currentY = touch.clientY;
+        const currentTime = performance.now();
+        const deltaY = currentY - lastTouchY;
+        const deltaTime = currentTime - lastTouchTime;
+
+        if (deltaTime > 0) touchVelocity = deltaY / deltaTime;
+
+        lastTouchY = currentY;
+        lastTouchTime = currentTime;
+
+        const deltaOffset = -(currentY - touchStartY) / (SLIDE_WIDTH + getCurrentGap());
+        currentOffset = touchStartOffset + deltaOffset;
+        requestUpdate();
+      }, { passive: true });
+
+      wheelSurface.addEventListener('touchend', () => {
+        if (!isTouching) return;
+        isTouching = false;
+
+        const TOUCH_FRICTION = 0.94;
+        const TOUCH_MIN_VELOCITY = 0.002;
+        let velocity = -touchVelocity / (SLIDE_WIDTH + getCurrentGap());
+
+        const finish = () => {
+          setMode('snapping');
+          smoothSnapTo(Math.round(currentOffset));
+          setTimeout(() => {
+            setUserActive(false);
+            if (!userHasTakenControl && !hasUserOwnedImages()) startRotation();
+          }, SNAP_DURATION);
+        };
+
+        if (Math.abs(velocity) > TOUCH_MIN_VELOCITY) {
+          const applyMomentum = () => {
+            currentOffset += velocity;
+            requestUpdate();
+            velocity *= TOUCH_FRICTION;
+            if (Math.abs(velocity) < TOUCH_MIN_VELOCITY) finish();
+            else requestAnimationFrame(applyMomentum);
+          };
+          requestAnimationFrame(applyMomentum);
+        } else {
+          finish();
+        }
+      }, { passive: true });
+    }
+  }
+}
+
+// ===== INIT + API =====
+function init() {
+  log('🏁 Initializing...');
+
+  slides.forEach((slide, idx) => {
+    if (idx < 3) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = variant(slide.images[0], 450, 300);
+      link.fetchPriority = idx === 0 ? 'high' : 'auto';
+      document.head.appendChild(link);
+    }
+  });
+
+  proxyBackend();
+  initCarousel();
+  setupEventHandlers();
+  setTimeout(startRotation, 1000);
+  log('🎉 Complete!');
+}
+
+window.aiPhotoCarousel = {
+  next: nextSlide,
+  prev: prevSlide,
+  getCurrentSlide,
+  pauseRotation,
+  startRotation,
+  expandPrompt,
+  stopTypewriter,
+  getFullPrompt: () => typewriterTargetPrompt || storedPrompt,
+  clearImages: (scope = 'all') => {
+    const sec = getImagesSection();
+    if (!sec) return;
+    sec.querySelectorAll('.image-thumbnail').forEach(thumb => {
+      if (scope === 'carousel' ? thumb.dataset.source === 'carousel' : true) thumb.remove();
+    });
+    if (!sec.querySelector('.image-thumbnail')) sec.classList.add('hidden');
+    if (scope === 'carousel' || scope === 'all') {
+      lastInjectedSlideId = null;
+      injectionInProgress = false;
+    }
+    if (!isSingleLineMode) scheduleSyncBackend();
+  },
+  setUserActive,
+  setInjectUrlForSlide(id, url) {
+    const s = slides.find(x => x.id === id);
+    if (s) s.injectUrl = (url || '').trim();
+  },
+  markUserUpload() {
+    stopTypewriter();
+    userHasTakenControl = true;
+    pauseRotation();
+    isFocusZoomed = false;
+
+    const track = q('slider-track');
+    if (track && !isMobile) track.style.cursor = 'default';
+
+    requestUpdate();
+  },
+  resetCarouselLandscape() {
+    isFocusZoomed = false;
+    userHasTakenControl = true;
+    pauseRotation();
+
+    const track = q('slider-track');
+    if (track && !isMobile) track.style.cursor = 'default';
+
+    requestUpdate();
+  },
+  resetAfterImageRemoval() {
+    userHasTakenControl = false;
+    const stillHasUserImages = hasUserOwnedImages();
+    isFocusZoomed = !isMobile && !stillHasUserImages;
+
+    const track = q('slider-track');
+    if (track && !isMobile) track.style.cursor = 'pointer';
+
+    requestUpdate();
+    if (!stillHasUserImages) startRotation();
+  },
+  getStoredPrompt: () => storedPrompt,
+  clearStoredPrompt() { storedPrompt = ''; },
+  markUserInControl() {
+    userHasTakenControl = true;
+    setUserActive(true);
+    pauseRotation();
+  },
+  resetAfterCarouselImageRemoval() {
+    userHasTakenControl = false;
+    storedPrompt = '';
+    injectionInProgress = false;
+    isFocusZoomed = !isMobile;
+    setUserActive(false);
+    requestUpdate();
+  }
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

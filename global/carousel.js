@@ -3,17 +3,8 @@
         import { animate } from 'https://cdn.jsdelivr.net/npm/motion@10.18.0/+esm';
 
         // ===== DATA =====
-        const slides = [
-            { id: 1, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/01_Photoshoot.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Photoshoot' },
-            { id: 2, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/02_Ad_Creative.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Ad Creative' },
-            { id: 3, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/03_upscale.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Upscale_OG_Image.jpg', label: 'Upscale' },
-            { id: 4, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/04_Logo.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Logo' },
-            { id: 5, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/08_Remove_BG.avif?w=900&h=600&fit=cover&auto=format'],injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Remove_BG_Original_Image.jpg',  label: 'Remove background' },
-            { id: 6, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/07_Social_Media.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Social media' },
-            { id: 7, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/09_Digital_Art.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Digital Art' },
-            { id: 8, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/06_Wm.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/hero-action/Wm_OG_Image.jpg', label: 'Remove watermarks' },
-            { id: 9, images: ['https://cdn.pixelbin.io/v2/falling-surf-7c8bb8/original/webflow-team/Pixelbin-V2/home/Hero-silder-images/05_poster.avif?w=900&h=600&fit=cover&auto=format'], injectUrl:'', label: 'Poster' }
-        ];
+        // Note: Image URLs are now defined in HTML with proper srcset/sizes
+        // This data structure is only used for prompts and metadata
 
         const prompts = {
             'Photoshoot': 'A luxury fashion campaign portrait of a confident woman in a blush pink tailored suit with a bralette underneath. She stands against a neutral beige fabric backdrop with soft shadows adding dimension. Her gaze is powerful, hair styled effortlessly sleek. Lighting is soft but directional, highlighting the satin sheen of the suit fabric. Ultra-realistic textures, clean editorial finish, cinematic luxury advertising style.',
@@ -302,8 +293,15 @@
             });
 
             // WRITE phase - apply all changes
-            positions.forEach(({ slide, isActive, x, opacity, zIndex, width, height }) => {
+            positions.forEach(({ slide, distance, x, opacity, zIndex, width, height }) => {
                 slide.style.zIndex = zIndex.toString();
+
+                // Hydrate images for active and adjacent slides only (distance -1, 0, 1)
+                const shouldHydrate = Math.abs(distance) <= 1;
+                const img = slide.querySelector('img');
+                if (img && shouldHydrate) {
+                    hydrateImg(img);
+                }
 
                 // PERFORMANCE: Add will-change hint for actively transitioning slides
                 const shouldAnimatePosition = !isDragging && !isMomentum;
@@ -462,6 +460,13 @@
                 const zIndex = getZIndex(distance);
 
                 slide.style.zIndex = zIndex.toString();
+
+                // Hydrate images for active and adjacent slides after loop reset
+                const shouldHydrate = Math.abs(distance) <= 1;
+                const img = slide.querySelector('img');
+                if (img && shouldHydrate) {
+                    hydrateImg(img);
+                }
 
                 // Use Motion One with duration 0 for instant, smooth repositioning
                 animate(
@@ -785,6 +790,50 @@
             }
         }
 
+        // ===== IMAGE LOADING HELPERS =====
+        // Prevent clones from downloading images unnecessarily
+
+        function unloadImg(img) {
+            if (!img || img.tagName !== 'IMG') return;
+
+            // Store original attributes for later restoration (use getAttribute to check attribute, not property)
+            const srcAttr = img.getAttribute('src');
+            const srcsetAttr = img.getAttribute('srcset');
+
+            if (srcAttr) {
+                img.dataset.originalSrc = srcAttr;
+            }
+            if (srcsetAttr) {
+                img.dataset.originalSrcset = srcsetAttr;
+            }
+
+            // Remove src and srcset to prevent download
+            img.removeAttribute('src');
+            img.removeAttribute('srcset');
+        }
+
+        function hydrateImg(img) {
+            if (!img || img.tagName !== 'IMG') return;
+
+            const hasSrc = img.hasAttribute('src');
+            const hasSrcset = img.hasAttribute('srcset');
+            const hasStoredSrc = !!img.dataset.originalSrc;
+            const hasStoredSrcset = !!img.dataset.originalSrcset;
+
+            // Restore src/srcset if they were previously stored and are currently missing
+            if (hasStoredSrc && !hasSrc) {
+                img.setAttribute('src', img.dataset.originalSrc);
+            }
+            if (hasStoredSrcset && !hasSrcset) {
+                img.setAttribute('srcset', img.dataset.originalSrcset);
+            }
+
+            // Warn if image has no src at all (shouldn't happen)
+            if (!hasSrc && !hasStoredSrc) {
+                console.warn('[CAROUSEL] Image has no src or stored src:', img.alt);
+            }
+        }
+
         // Smooth settling animation using RAF and lerp (Smooothy-inspired)
         function startSmoothSettling() {
             isSettling = true;
@@ -912,6 +961,13 @@
                 const clone = slide.cloneNode(true);
                 clone.removeAttribute('data-slide-index'); // Mark as clone
                 clone.setAttribute('data-clone', 'before');
+
+                // Unload images from clone to prevent unnecessary downloads
+                const img = clone.querySelector('img');
+                if (img) {
+                    unloadImg(img);
+                }
+
                 return clone;
             });
 
@@ -919,28 +975,34 @@
                 const clone = slide.cloneNode(true);
                 clone.removeAttribute('data-slide-index'); // Mark as clone
                 clone.setAttribute('data-clone', 'after');
+
+                // Unload images from clone to prevent unnecessary downloads
+                const img = clone.querySelector('img');
+                if (img) {
+                    unloadImg(img);
+                }
+
                 return clone;
             });
 
-            // Clear container and rebuild with clones
-            slidesContainer.innerHTML = '';
+            console.log('[CAROUSEL] Created', clonesBefore.length, 'clones before and', clonesAfter.length, 'clones after. Total slides:', originalSlideCount * 3);
 
-            // Add clones before
-            clonesBefore.forEach(clone => {
-                slidesContainer.appendChild(clone);
-                slideElements.push(clone);
-            });
+            // Build slideElements array in correct order
+            slideElements.length = 0; // Clear array
+            slideElements.push(...clonesBefore);
+            slideElements.push(...originalSlides);
+            slideElements.push(...clonesAfter);
 
-            // Add originals
-            originalSlides.forEach(slide => {
-                slidesContainer.appendChild(slide);
-                slideElements.push(slide);
-            });
+            // Prepend clones before (in reverse order to maintain sequence)
+            for (let i = clonesBefore.length - 1; i >= 0; i--) {
+                slidesContainer.prepend(clonesBefore[i]);
+            }
 
-            // Add clones after
+            // Original slides already in DOM - do nothing
+
+            // Append clones after
             clonesAfter.forEach(clone => {
                 slidesContainer.appendChild(clone);
-                slideElements.push(clone);
             });
 
             // Add label tags to all slides
@@ -1071,6 +1133,13 @@
                 slide.style.zIndex = zIndex.toString();
                 slide.style.display = 'flex'; // Safari fix
 
+                // Hydrate images for active and adjacent slides only on initial load
+                const shouldHydrate = Math.abs(distance) <= 1;
+                const img = slide.querySelector('img');
+                if (img && shouldHydrate) {
+                    hydrateImg(img);
+                }
+
                 // Directly set initial styles at final positions but invisible
                 slide.style.transform = `translateX(${baseX}px) translateZ(0)`;
                 slide.style.opacity = '0';
@@ -1167,6 +1236,13 @@
                     const width = isActive ? CONFIG.activeWidth : CONFIG.inactiveWidth;
                     const height = isActive ? CONFIG.activeHeight : CONFIG.inactiveHeight;
                     const zIndex = getZIndex(distance);
+
+                    // Hydrate images for active and adjacent slides
+                    const shouldHydrate = Math.abs(distance) <= 1;
+                    const img = slide.querySelector('img');
+                    if (img && shouldHydrate) {
+                        hydrateImg(img);
+                    }
 
                     // Use direct style manipulation for instant positioning
                     slide.style.transform = `translateX(${baseX}px) translateZ(0)`;

@@ -63,7 +63,7 @@
             // Different dimensions for active vs inactive
             inactiveWidth: 328,
             inactiveHeight: 437,
-            activeWidth: isMobile ? 378 : 748,
+            activeWidth: isMobile ? 328 : 748,
             activeHeight: 437,
             // Autoplay settings
             autoplayEnabled: true,

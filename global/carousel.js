@@ -47,10 +47,8 @@
             try {
                 const motionModule = await import('https://cdn.jsdelivr.net/npm/motion@10.18.0/+esm');
                 animate = motionModule.animate;
-                console.log('[CAROUSEL] Motion One loaded');
                 return true;
             } catch (err) {
-                console.warn('[CAROUSEL] Failed to load Motion One, using fallback:', err);
                 return false;
             }
         }
@@ -239,15 +237,13 @@
 
         // Mark that user has taken control (called when user types in prompt box)
         function markUserControl() {
-            console.log('[CAROUSEL] User has taken control');
             userHasTakenControl = true;
             stopTypewriter();
-            pauseAutoplay();
+            pauseAutoplay('user took control (typing/uploading)');
         }
 
         // Reset user control (called when prompt box is cleared or reset)
         function resetUserControl() {
-            console.log('[CAROUSEL] Resetting user control');
             userHasTakenControl = false;
             resumeAutoplay();
         }
@@ -448,18 +444,16 @@
             document.getElementById('prevBtn').disabled = false;
             document.getElementById('nextBtn').disabled = false;
 
-            // Update indicators based on original index
+            // Update indicators based on original index - use namespaced class to avoid Webflow conflicts
             document.querySelectorAll('.indicator').forEach((indicator, i) => {
-                indicator.classList.toggle('active', i === originalIndex);
+                indicator.classList.toggle('carousel-active', i === originalIndex);
             });
 
             // Get and log active slide data (for debugging/integration purposes)
             const slideData = getActiveSlideData();
-            console.log('Active Slide:', slideData);
 
             // Clear carousel-injected images when slide changes in demo mode
             if (!userHasTakenControl && window.searchFeature?.clearImages) {
-                console.log('[CAROUSEL] Demo mode - clearing carousel images for new slide');
                 window.searchFeature.clearImages('carousel');
             }
 
@@ -520,11 +514,9 @@
             if (activeIndex < originalSlideCount) {
                 // Going backward: clone → last original
                 newIndex = activeIndex + originalSlideCount;
-                console.log('[CAROUSEL] Seamless backward loop:', activeIndex, '→', newIndex);
             } else {
                 // Going forward: clone → first original
                 newIndex = activeIndex - originalSlideCount;
-                console.log('[CAROUSEL] Seamless forward loop:', activeIndex, '→', newIndex);
             }
 
             // Block transitions during reset
@@ -574,7 +566,7 @@
             // Update indicators only (DON'T trigger typewriter or content changes)
             const originalIndex = ((newIndex - originalSlideCount) % originalSlideCount + originalSlideCount) % originalSlideCount;
             document.querySelectorAll('.indicator').forEach((indicator, i) => {
-                indicator.classList.toggle('active', i === originalIndex);
+                indicator.classList.toggle('carousel-active', i === originalIndex);
             });
 
             // Re-enable transitions
@@ -593,7 +585,6 @@
             if (targetIndex < originalSlideCount) {
                 // Would land on clone before → jump to last original
                 targetIndex = targetIndex + originalSlideCount;
-                console.log('[CAROUSEL] Button prev wrap: avoiding clone, jumping to', targetIndex);
             }
 
             goToSlide(targetIndex);
@@ -609,7 +600,6 @@
             if (targetIndex >= originalSlideCount * 2) {
                 // Would land on clone after → jump to first original
                 targetIndex = targetIndex - originalSlideCount;
-                console.log('[CAROUSEL] Button next wrap: avoiding clone, jumping to', targetIndex);
             }
 
             goToSlide(targetIndex);
@@ -621,6 +611,7 @@
         // Autoplay state
         let autoplayTimer = null;
         let isAutoplayPaused = false;
+        let autoplayPauseReason = ''; // Track why autoplay is paused
 
         // Autoplay functions
         function startAutoplay() {
@@ -632,6 +623,7 @@
                 autoplayTimer = setInterval(() => {
                     goToNext();
                 }, CONFIG.autoplayDelay);
+            } else {
             }
         }
 
@@ -642,13 +634,15 @@
             }
         }
 
-        function pauseAutoplay() {
+        function pauseAutoplay(reason = 'user interaction') {
             isAutoplayPaused = true;
+            autoplayPauseReason = reason;
             stopAutoplay();
         }
 
         function resumeAutoplay() {
             isAutoplayPaused = false;
+            autoplayPauseReason = '';
             startAutoplay();
         }
 
@@ -656,6 +650,15 @@
         function handleDragStart(e) {
             // Don't start new drag while momentum is active
             if (isMomentum) return;
+
+            // CRITICAL: Only process if event originated from carousel viewport
+            const viewport = document.querySelector('.viewport');
+            if (!viewport || !viewport.contains(e.target)) {
+                return; // Event not from carousel - ignore completely
+            }
+
+            // IMPORTANT: Stop event from bubbling to prevent interfering with navbar/other interactions
+            e.stopPropagation();
 
             isDragging = true;
             dragStartActiveIndex = activeIndex; // Remember which slide was active
@@ -671,13 +674,34 @@
             stopTypewriter();
 
             // Pause autoplay when user interacts
-            pauseAutoplay();
+            pauseAutoplay('carousel drag started');
+
+            // IMPORTANT: Attach document listeners only when dragging starts
+            if (e.type.includes('mouse')) {
+                document.addEventListener('mousemove', handleDragMove, { capture: true });
+                document.addEventListener('mouseup', handleDragEnd, { capture: true });
+            } else {
+                document.addEventListener('touchmove', handleDragMove, { passive: false, capture: true });
+                document.addEventListener('touchend', handleDragEnd, { capture: true });
+            }
         }
 
         function handleDragMove(e) {
-            if (!isDragging) return;
+            if (!isDragging) {
+                // Safety: If not dragging, remove listeners and bail
+                if (e.type.includes('mouse')) {
+                    document.removeEventListener('mousemove', handleDragMove, { capture: true });
+                    document.removeEventListener('mouseup', handleDragEnd, { capture: true });
+                } else {
+                    document.removeEventListener('touchmove', handleDragMove, { capture: true });
+                    document.removeEventListener('touchend', handleDragEnd, { capture: true });
+                }
+                return;
+            }
 
+            // IMPORTANT: Only preventDefault and stopPropagation when actively dragging
             e.preventDefault();
+            e.stopPropagation();
 
             const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
             const currentTime = Date.now();
@@ -720,6 +744,9 @@
         function handleDragEnd(e) {
             if (!isDragging) return;
 
+            // IMPORTANT: Stop event from bubbling
+            e.stopPropagation();
+
             document.body.style.cursor = '';
 
             const dragOffset = dragCurrentX - dragStartX;
@@ -727,6 +754,15 @@
 
             // Calculate velocity (px per ms) over the tracked period
             const velocity = (dragCurrentX - lastDragX) / Math.max(timeSinceLastUpdate, 1);
+
+            // IMPORTANT: Remove document listeners immediately to free up navbar
+            if (e.type.includes('mouse')) {
+                document.removeEventListener('mousemove', handleDragMove, { capture: true });
+                document.removeEventListener('mouseup', handleDragEnd, { capture: true });
+            } else {
+                document.removeEventListener('touchmove', handleDragMove, { capture: true });
+                document.removeEventListener('touchend', handleDragEnd, { capture: true });
+            }
 
             if (CONFIG.momentumEnabled && Math.abs(velocity) > CONFIG.momentumMinVelocity) {
                 // Apply momentum physics - keep isDragging true during momentum
@@ -918,7 +954,6 @@
 
             // Warn if image has no src at all (shouldn't happen)
             if (!hasSrc && !hasStoredSrc) {
-                console.warn('[CAROUSEL] Image has no src or stored src:', img.alt);
             }
         }
 
@@ -1033,7 +1068,6 @@
         function injectLazySlides() {
             const lazyDataScript = document.getElementById('lazy-slides-data');
             if (!lazyDataScript) {
-                console.log('[CAROUSEL] No lazy slides to inject');
                 return;
             }
 
@@ -1065,9 +1099,7 @@
                     slidesContainer.appendChild(slideDiv);
                 });
 
-                console.log('[CAROUSEL] Injected', lazySlides.length, 'lazy slides');
             } catch (err) {
-                console.error('[CAROUSEL] Failed to inject lazy slides:', err);
             }
         }
 
@@ -1084,7 +1116,6 @@
             originalSlideCount = originalSlides.length;
 
             if (originalSlideCount === 0) {
-                console.error('No slides found in HTML!');
                 return;
             }
 
@@ -1118,7 +1149,6 @@
                 return clone;
             });
 
-            console.log('[CAROUSEL] Created', clonesBefore.length, 'clones before and', clonesAfter.length, 'clones after. Total slides:', originalSlideCount * 3);
 
             // Build slideElements array in correct order
             slideElements.length = 0; // Clear array
@@ -1157,6 +1187,9 @@
             // Add click handlers to all slides (including clones)
             slideElements.forEach((slide, index) => {
                 slide.addEventListener('click', (e) => {
+                    // IMPORTANT: Prevent click from bubbling to navbar/other elements
+                    e.stopPropagation();
+
                     // Check if this was a drag (not a real click)
                     const dragDistance = Math.abs(dragCurrentX - dragStartX);
                     if (dragDistance <= 5) { // Only navigate if it's a real click
@@ -1202,7 +1235,6 @@
                             bestTarget = targetInClonesAfter;
                         }
 
-                        console.log('[CAROUSEL] Click shortest path:', currentIndex, '→', bestTarget, 'to reach slide', targetOriginalValue);
 
                         goToSlide(bestTarget);
                     }
@@ -1214,7 +1246,10 @@
                 const indicator = document.createElement('button');
                 indicator.className = 'indicator';
                 indicator.textContent = (i + 1).toString();
-                indicator.addEventListener('click', () => {
+                indicator.addEventListener('click', (e) => {
+                    // IMPORTANT: Prevent indicator clicks from bubbling
+                    e.stopPropagation();
+
                     stopTypewriter();
 
                     // BUG FIX: Use shortest path to target (same logic as slide clicks)
@@ -1243,7 +1278,6 @@
                         bestTarget = targetInClonesAfter;
                     }
 
-                    console.log('[CAROUSEL] Indicator shortest path:', currentIndex, '→', bestTarget, 'for slide', targetOriginalValue);
 
                     goToSlide(bestTarget);
                 });
@@ -1320,35 +1354,40 @@
                 updateControls(activeIndex);
             }, 50);
 
-            // Add drag event listeners to viewport
+            // Add drag event listeners to viewport ONLY
+            // Document listeners will be added dynamically when drag starts
             const viewport = document.querySelector('.viewport');
 
-            // Mouse events
+            // Mouse events - only mousedown on viewport
             viewport.addEventListener('mousedown', handleDragStart);
-            document.addEventListener('mousemove', handleDragMove);
-            document.addEventListener('mouseup', handleDragEnd);
 
-            // Touch events
+            // Touch events - only touchstart on viewport
             viewport.addEventListener('touchstart', handleDragStart, { passive: false });
-            document.addEventListener('touchmove', handleDragMove, { passive: false });
-            document.addEventListener('touchend', handleDragEnd);
 
             // Hover events for autoplay
             viewport.addEventListener('mouseenter', () => {
-                pauseAutoplay();
+                pauseAutoplay('mouse hover on carousel');
             });
 
             viewport.addEventListener('mouseleave', () => {
-                resumeAutoplay();
+                if (!userHasTakenControl) {
+                    resumeAutoplay();
+                }
             });
 
             // Navigation button event listeners
-            document.getElementById('prevBtn').addEventListener('click', () => {
+            document.getElementById('prevBtn').addEventListener('click', (e) => {
+                // IMPORTANT: Prevent button clicks from bubbling
+                e.stopPropagation();
+
                 stopTypewriter();
                 goToPrev();
             });
 
-            document.getElementById('nextBtn').addEventListener('click', () => {
+            document.getElementById('nextBtn').addEventListener('click', (e) => {
+                // IMPORTANT: Prevent button clicks from bubbling
+                e.stopPropagation();
+
                 stopTypewriter();
                 goToNext();
             });
@@ -1362,13 +1401,21 @@
         function handleVisibilityChange() {
             if (document.hidden) {
                 // Tab became hidden - pause everything
-                stopAutoplay();
+                pauseAutoplay('tab/window hidden');
                 stopTypewriter();
 
                 // Cancel any ongoing settling animation
                 if (isSettling && settlingAnimationFrame) {
                     cancelAnimationFrame(settlingAnimationFrame);
                     isSettling = false;
+                }
+
+                // IMPORTANT: Clean up document listeners if dragging
+                if (isDragging) {
+                    document.removeEventListener('mousemove', handleDragMove, { capture: true });
+                    document.removeEventListener('mouseup', handleDragEnd, { capture: true });
+                    document.removeEventListener('touchmove', handleDragMove, { capture: true });
+                    document.removeEventListener('touchend', handleDragEnd, { capture: true });
                 }
 
                 // Reset drag state to prevent broken state
@@ -1415,6 +1462,65 @@
         // Listen for visibility changes
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
+        // Intersection Observer - pause when carousel scrolls out of view
+        function setupIntersectionObserver() {
+            const carouselSection = document.querySelector('.viewport')?.parentElement;
+            if (!carouselSection) return;
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        // Carousel is visible - resume if not in user control mode
+                        if (!userHasTakenControl && !isDragging) {
+                            resumeAutoplay();
+                        }
+                    } else {
+                        // Carousel scrolled out of view - pause everything
+                        pauseAutoplay('carousel scrolled out of view');
+                    }
+                });
+            }, {
+                threshold: 0.2, // Trigger when 20% visible
+                rootMargin: '0px'
+            });
+
+            observer.observe(carouselSection);
+        }
+
+        // Setup intersection observer after initialization
+        setTimeout(setupIntersectionObserver, 1000);
+
+        // Click outside detector - pause when user interacts with navbar or other content
+        function handleClickOutside(e) {
+            const viewport = document.querySelector('.viewport');
+            const carouselContainer = viewport?.parentElement;
+
+            // If click is outside carousel and autoplay is running
+            if (carouselContainer && !carouselContainer.contains(e.target)) {
+                // Check if click is on navbar - if so, ignore
+                const navbar = document.querySelector('.nav_container, .w-nav');
+                if (navbar && navbar.contains(e.target)) {
+                    return; // Navbar click - don't pause carousel
+                }
+
+                // User clicked outside carousel (other content, etc.)
+                // Temporarily pause autoplay for better UX
+                if (!isAutoplayPaused && CONFIG.autoplayEnabled) {
+                    pauseAutoplay('click outside carousel (content)');
+
+                    // Auto-resume after 5 seconds if user hasn't taken control
+                    setTimeout(() => {
+                        if (!userHasTakenControl && !isDragging) {
+                            resumeAutoplay();
+                        }
+                    }, 5000);
+                }
+            }
+        }
+
+        // Add click outside listener (non-intrusive)
+        document.addEventListener('click', handleClickOutside, { passive: true });
+
         // ⚡ PERFORMANCE OPTIMIZATION: Defer carousel initialization
         // Wait for LCP before initializing to avoid blocking main thread
         function deferredInit() {
@@ -1454,15 +1560,12 @@
             // Monitor focus on textarea - user is showing intent to interact
             if (promptTextArea) {
                 promptTextArea.addEventListener('focus', () => {
-                    console.log('[CAROUSEL] Textarea focused - user taking control');
 
                     // CRITICAL: Preserve current slide position
                     const currentSlideBeforeFocus = activeIndex;
-                    console.log('[CAROUSEL] Current slide at focus:', currentSlideBeforeFocus);
 
                     // If typewriter is active, show full prompt immediately
                     if (isTypewriterActive && currentTypewriterPrompt) {
-                        console.log('[CAROUSEL] Stopping typewriter and showing full prompt');
                         stopTypewriter();
                         if (window.searchFeature?.setPrompt) {
                             window.searchFeature.setPrompt(currentTypewriterPrompt, false);
@@ -1479,7 +1582,6 @@
 
                     // Only inject if: no images exist, slide has injectUrl, and we haven't injected this slide before
                     if (!hasImages && slideData.injectUrl && !injectedSlideKeys.has(slideKey)) {
-                        console.log('[CAROUSEL] Auto-injecting sample image for slide:', slideData.label);
                         if (window.searchFeature?.setExternalImage) {
                             window.searchFeature.setExternalImage(slideData.injectUrl, slideKey);
                             injectedSlideKeys.add(slideKey);
@@ -1501,11 +1603,9 @@
 
                 // Monitor blur/defocus - resume typewriter if user didn't type anything
                 promptTextArea.addEventListener('blur', () => {
-                    console.log('[CAROUSEL] Textarea blurred - checking if we should reset');
 
                     // CRITICAL: Preserve current slide position
                     const currentSlideBeforeBlur = activeIndex;
-                    console.log('[CAROUSEL] Current slide before blur:', currentSlideBeforeBlur);
 
                     // Get current state
                     const promptValue = promptTextArea.value || '';
@@ -1521,21 +1621,16 @@
                     if (window.searchFeature?.getImageCount) {
                         const userImageCount = window.searchFeature.getImageCount('user');
                         hasUserImages = userImageCount > 0;
-                        console.log('[CAROUSEL] User image count from API:', userImageCount);
                     } else {
-                        console.warn('[CAROUSEL] getImageCount API not available - assuming no user images');
                     }
 
                     // Rule: If user has uploaded images, stay in user mode
                     if (hasUserImages) {
-                        console.log('[CAROUSEL] User has uploaded images - staying in user mode (no auto-demo)');
                         return; // Exit early - don't reset to demo mode
                     }
 
                     // If user didn't modify anything and has no user-added images, reset to demo mode
                     if (userDidNotModify && !hasUserImages && userHasTakenControl) {
-                        console.log('[CAROUSEL] No modifications and no user images - resetting to demo mode');
-                        console.log('[CAROUSEL] PRESERVING slide position:', currentSlideBeforeBlur);
 
                         // Clear any auto-injected carousel images
                         if (window.searchFeature?.clearImages) {
@@ -1556,8 +1651,6 @@
                             activeIndex = currentSlideBeforeBlur;
                             dragStartActiveIndex = currentSlideBeforeBlur;
                             targetSlideIndex = currentSlideBeforeBlur;
-                        } else {
-                            console.log('[CAROUSEL] ✓ Slide position preserved correctly');
                         }
 
                         // Don't re-trigger typewriter here - it will happen on next slide change
@@ -1572,7 +1665,6 @@
 
                     // User typed something - take control
                     if (hasValue && !userHasTakenControl) {
-                        console.log('[CAROUSEL] User typed in textarea - taking control');
                         markUserControl();
                     }
 
@@ -1586,12 +1678,10 @@
             if (addButton) {
                 addButton.addEventListener('click', () => {
                     const positionBeforeAction = activeIndex;
-                    console.log('[CAROUSEL] Add button clicked - user taking control');
                     markUserControl();
 
                     // Verify position preserved
                     if (activeIndex !== positionBeforeAction) {
-                        console.error('[CAROUSEL] Position changed on add button!');
                         activeIndex = positionBeforeAction;
                         dragStartActiveIndex = positionBeforeAction;
                         targetSlideIndex = positionBeforeAction;
@@ -1604,12 +1694,10 @@
                 fileInput.addEventListener('change', (e) => {
                     if (e.target.files && e.target.files.length > 0) {
                         const positionBeforeAction = activeIndex;
-                        console.log('[CAROUSEL] File uploaded - user taking control');
                         markUserControl();
 
                         // Verify position preserved
                         if (activeIndex !== positionBeforeAction) {
-                            console.error('[CAROUSEL] Position changed on file upload!');
                             activeIndex = positionBeforeAction;
                             dragStartActiveIndex = positionBeforeAction;
                             targetSlideIndex = positionBeforeAction;
@@ -1622,12 +1710,10 @@
             if (generateButton) {
                 generateButton.addEventListener('click', () => {
                     const positionBeforeAction = activeIndex;
-                    console.log('[CAROUSEL] Generate button clicked - user taking control');
                     markUserControl();
 
                     // Verify position preserved
                     if (activeIndex !== positionBeforeAction) {
-                        console.error('[CAROUSEL] Position changed on generate button!');
                         activeIndex = positionBeforeAction;
                         dragStartActiveIndex = positionBeforeAction;
                         targetSlideIndex = positionBeforeAction;

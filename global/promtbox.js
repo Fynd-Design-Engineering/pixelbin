@@ -1,7 +1,6 @@
 // ===== MAIN UI CONTROLLER =====
 document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("searchContainer");
-  if (!container) { console.error("[UI] #searchContainer not found"); return; }
 
   const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
   const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
@@ -421,14 +420,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // If typewriter is active, get the FULL prompt directly from carousel
     if (state.isTypewriterActive) {
-      console.log('[PROMTBOX] Typewriter is active, getting full prompt from carousel...');
       // Stop typewriter animation
       window.searchFeature?.setTypewriterActive?.(false);
       // Get the FULL prompt that was being typed
       const fullPrompt = window.aiPhotoCarousel?.getFullPrompt?.();
       if (fullPrompt) {
         promptLive = fullPrompt;
-        console.log('[PROMTBOX] Got full prompt from carousel:', promptLive.substring(0, 50) + '...');
         // Update the UI with full prompt
         state.inputValue = fullPrompt;
         if (textArea) textArea.value = fullPrompt;
@@ -444,7 +441,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const prompt = resolvePromptForSubmit(promptLive);
-    console.log('[PROMTBOX] Submitting prompt:', prompt.substring(0, 50) + '...');
     const needs = keywordNeedsImage(prompt);
 
     if (!prompt) { flashError("Please enter a prompt."); return; }
@@ -454,15 +450,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const externalEntry = state.images.find(x => !x.file);
     const externalImageUrl = externalEntry?.url;
     const externalSlideKey = externalEntry?.slideKey || "carousel";
-
-    console.log('[Generate] Debug:', {
-      needs,
-      filesCount: files.length,
-      externalImageUrl,
-      totalImages: state.images.length,
-      images: state.images.map(x => ({ hasFile: !!x.file, source: x.source, url: x.url?.substring(0, 50) })),
-      firstFile: files[0]
-    });
 
     if (needs && files.length === 0 && !externalImageUrl) {
       showImageHint();
@@ -513,7 +500,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         window.location.href = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
       } catch (err) {
-        console.error("[submit fail]", err);
         try { flashErrorInline?.(err?.message || "Upload failed. Please try again."); }
         catch { flashError(err?.message || "Upload failed. Please try again."); }
         setGenerating(false);
@@ -525,7 +511,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Error UI
   const flashError = (msg) => {
-    console.error(msg);
     const box = q("uploadError"), txt = q("uploadErrorText");
     if (box && txt) { txt.textContent = msg; box.style.display = "block"; }
     form?.classList.add("error");
@@ -536,10 +521,8 @@ document.addEventListener("DOMContentLoaded", () => {
   window.searchFeature = {
     setPrompt(text, isTypewriter = false) {
       const next = text || "";
-      console.log('[PROMTBOX] setPrompt called with:', next.substring(0, 50) + '...', 'isTypewriter:', isTypewriter);
       state.inputValue = next;
       if (textArea) textArea.value = next;
-      console.log('[PROMTBOX] After setPrompt, state.inputValue:', state.inputValue.substring(0, 50) + '...');
       // Don't update char counter during typewriter animation
       if (!isTypewriter) {
         updateState();
@@ -605,7 +588,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   window.PB_ENV = PB_ENV;
-  if (PB_DEBUG) console.info("[PB_ENV]", PB_ENV);
 
   const buildUploadUrl = (orgId) => {
     if (!orgId) return PB_ENV.API_URL;
@@ -614,7 +596,6 @@ document.addEventListener("DOMContentLoaded", () => {
       url.pathname = url.pathname.replace(/\/upload\/direct$/, `/org/${encodeURIComponent(orgId)}/upload/direct`);
       return url.toString();
     } catch (e) {
-      if (PB_DEBUG) console.error("[upload] failed to build org upload URL; using default", e);
       return PB_ENV.API_URL;
     }
   };
@@ -701,12 +682,10 @@ document.addEventListener("DOMContentLoaded", () => {
         this._signedHeaders(),
         bodyHash,
       ].join("\n");
-      if (PB_DEBUG) console.debug("[Signer] canonicalRequest\n", s);
       return s;
     }
     _stringToSign() {
       const sts = [this._ts(), hexSha256(this._canonRequest())].join("\n");
-      if (PB_DEBUG) console.debug("[Signer] stringToSign\n", sts);
       return sts;
     }
     sign() {
@@ -718,10 +697,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const clientKey = clientKeyCandidate || "1234567";
       if (!clientKeyCandidate && PB_DEBUG && !PB_ENV.__warnedFallbackClientKey) {
         PB_ENV.__warnedFallbackClientKey = true;
-        console.warn("[Signer] Using fallback client key; set data-client-key attributes for production values.");
       }
       h["x-ebg-signature"] = "v1:" + hexHmac(clientKey, this._stringToSign());
-      if (PB_DEBUG) console.debug("[Signer] headers", h);
       return this.r;
     }
   }
@@ -732,7 +709,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (apiReady) return apiReady;
     apiReady = new Promise((resolve, reject) => {
       if (!document.getElementById("recaptcha-container")) {
-        console.error("[reCAPTCHA] #recaptcha-container not found");
         reject(new Error("recaptcha-container missing"));
         return;
       }
@@ -747,16 +723,13 @@ document.addEventListener("DOMContentLoaded", () => {
             sitekey: PB_ENV.SITE_KEY,
             size: "invisible",
             callback: (token) => {
-              if (PB_DEBUG) console.debug("[reCAPTCHA] token", token);
               if (pendingResolve) pendingResolve(token);
               pendingResolve = null;
               grecaptcha.reset(widgetId);
             },
           });
-          if (PB_DEBUG) console.info("[reCAPTCHA] rendered, widgetId=", widgetId);
           resolve();
         } catch (e) {
-          console.error("[reCAPTCHA] render error", e);
           reject(e);
         }
       };
@@ -767,19 +740,15 @@ document.addEventListener("DOMContentLoaded", () => {
   window.pbGetRecaptchaToken = () => loadRecaptcha().then(() => new Promise((resolve, reject) => {
     pendingResolve = resolve;
     try {
-      if (PB_DEBUG) console.debug("[reCAPTCHA] executing");
       grecaptcha.execute(widgetId);
     } catch (e) {
       pendingResolve = null;
-      console.error("[reCAPTCHA] execute error", e);
       reject(e);
     }
   }));
 
   // Direct upload (XHR)
   window.pbDirectUpload = async (file, requestId, captchaCode, orgId = null, filenameOverride = true, onProgress = () => {}) => {
-    console.group("[pbDirectUpload]");
-    console.log("file:", file?.name, file?.type, file?.size, "requestId:", requestId);
     const form = new FormData();
     form.append("file", file, file.name);
     form.append("filenameOverride", JSON.stringify(filenameOverride));
@@ -803,39 +772,26 @@ document.addEventListener("DOMContentLoaded", () => {
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const pct = (e.loaded / e.total) * 100;
-          if (PB_DEBUG) console.debug("[upload] progress", pct.toFixed(1) + "%");
           onProgress(pct, requestId);
         }
-      };
-      xhr.onreadystatechange = () => {
-        if (PB_DEBUG) console.debug("[upload] readyState", xhr.readyState, "status", xhr.status);
       };
       xhr.onload = () => {
         if (xhr.status === 200) {
           try {
             const json = JSON.parse(xhr.response);
-            console.log("[upload] success", json);
-            console.groupEnd();
             resolve(json);
           } catch {
-            console.error("[upload] invalid JSON");
-            console.groupEnd();
             reject({ status: 200, message: "Invalid JSON" });
           }
         } else {
           let msg = "";
           try { msg = JSON.parse(xhr.response); } catch { msg = xhr.statusText; }
-          console.error("[upload] error", xhr.status, msg);
-          console.groupEnd();
           reject({ status: xhr.status, message: msg });
         }
       };
       xhr.onerror = () => {
-        console.error("[upload] network error", xhr.status, xhr.statusText);
-        console.groupEnd();
         reject({ status: xhr.status, message: xhr.statusText });
       };
-      if (PB_DEBUG) console.info("[upload] POST", PB_ENV.API_URL);
       xhr.send(form);
     });
   };
@@ -847,7 +803,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (prompt) params.set("transformationPrompt", prompt);
     const redirectTo = params.toString() ? `${toolRoute}?${params.toString()}` : toolRoute;
     const final = `${PB_ENV.CONSOLE_BASE}/choose-org?redirectTo=${encodeURIComponent(redirectTo)}`;
-    if (PB_DEBUG) console.info("[redirect]", final);
     return final;
   };
 })();
@@ -857,7 +812,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof window.pbGetRecaptchaToken !== "function" ||
       typeof window.pbDirectUpload !== "function" ||
       typeof window.pbBuildStudioRedirect !== "function") {
-    console.error("[integration] Core upload functions missing. Ensure CryptoJS + Core Upload load BEFORE this script.");
     return;
   }
 
@@ -877,7 +831,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (t) t.textContent = `${Math.round(p)}%`;
   };
   window.flashErrorInline = (msg) => {
-    console.error("[integration] ", msg);
     const box = document.getElementById("uploadError");
     const txt = document.getElementById("uploadErrorText");
     if (box && txt) {
@@ -889,16 +842,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // aiSearchSubmit event handler (legacy support)
   window.addEventListener("aiSearchSubmit", (e) => {
     if (!e?.detail) {
-      console.warn("[aiSearchSubmit] missing detail");
       return;
     }
     handleSubmit(e.detail);
   });
 
   async function handleSubmit(detail) {
-    console.group("[aiSearchSubmit]");
-    console.log("detail:", detail);
-
     const tool = detail.tool || "ai-editor";
     const prompt = (detail.prompt || "").trim();
     const files = Array.isArray(detail.files) ? detail.files : [];
@@ -907,29 +856,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!prompt) {
       flashErrorInline("Please enter a prompt.");
-      console.groupEnd();
       return;
     }
 
     if (needs && files.length === 0 && !externalUrl) {
       flashErrorInline("This prompt needs an image. Please upload one.");
-      console.groupEnd();
       return;
     }
 
     if (externalUrl && files.length === 0) {
       const studioRoute = `/studio/${tool}`;
       const redirectURL = pbBuildStudioRedirect(studioRoute, externalUrl, prompt);
-      console.log("[step] redirecting (external image url)", redirectURL);
       window.location.href = redirectURL;
-      console.groupEnd();
       return;
     }
 
     const file = files[0];
     if (!file) {
       flashErrorInline("No file selected.");
-      console.groupEnd();
       return;
     }
 
@@ -937,26 +881,19 @@ document.addEventListener("DOMContentLoaded", () => {
       showProgress();
       setProgress(0);
 
-      console.log("[step] get reCAPTCHA token");
       const captcha = await pbGetRecaptchaToken();
       if (!captcha) throw new Error("reCAPTCHA token missing");
-      console.log("[ok] captcha");
 
-      console.log("[step] upload file");
       const resp = await pbDirectUpload(file, 1, captcha, null, true, (pct) => setProgress(pct));
       if (!resp?.url) throw new Error("Upload succeeded but no URL returned");
-      console.log("[ok] upload ->", resp.url);
 
       const studioRoute = `/studio/${tool}`;
       const redirectURL = pbBuildStudioRedirect(studioRoute, resp.url, prompt);
-      console.log("[step] redirecting (with image)", redirectURL);
       window.location.href = redirectURL;
     } catch (err) {
-      console.error("[fail]", err);
       flashErrorInline(err?.message || "Upload failed. Please try again.");
     } finally {
       hideProgress();
-      console.groupEnd();
     }
   }
 })();

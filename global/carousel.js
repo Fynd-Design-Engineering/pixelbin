@@ -65,15 +65,14 @@
         // This data structure is only used for prompts and metadata
 
         const prompts = {
-            'Photoshoot': 'A luxury fashion campaign portrait of a confident woman in a blush pink tailored suit with a bralette underneath. She stands against a neutral beige fabric backdrop with soft shadows adding dimension. Her gaze is powerful, hair styled effortlessly sleek. Lighting is soft but directional, highlighting the satin sheen of the suit fabric. Ultra-realistic textures, clean editorial finish, cinematic luxury advertising style.',
-            'Ad Creative': 'A playful food campaign visual featuring two colorful eclairs - one chocolate, one strawberry - floating on a pastel blue background. Repeating text pattern reads "So Yum" in centre in all caps white sans-serif font. Soft shadows and realistic textures on the pastries. Fun, graphic, and modern lifestyle branding aesthetic.',
-            'Poster': 'A retro-inspired sneaker poster ad featuring a pair of Nike Dunk High sneakers in burnt orange and white, floating mid-air against a bright blue sky with soft white clouds. The sneakers are shown in photorealistic detail with visible leather texture, stitching, and laces, arranged to highlight both the side profile and top view. The composition is minimalist, with the Nike swoosh logo and bold white text placed subtly around the frame, alongside smaller retro tagline text with a slightly blurred, print-like effect. The overall style has a vintage sports ad aesthetic with a dreamy, nostalgic mood, enhanced by a grainy overlay and soft tones, evoking the feel of classic 90s sneaker campaigns',
-            'Digital Art': 'A minimalist surreal scene featuring a human silhouette made of translucent water standing on a dry cracked desert floor. The figure mirrors the sky above, reflecting clouds and light. Colors are muted - soft ivory, desaturated cyan, and warm beige. Lighting is cinematic and diffused. Symbolic, emotional, and deeply aesthetic digital artwork.',
-            'Social media': 'A lifestyle beverage ad featuring a chilled Corona-style beer bottle leaning casually against a carved sandy surface with soft ripples, surrounded by freshly sliced limes glistening with juice. Golden sunlight spills across the scene, illuminating condensation droplets and highlighting the rich amber tones of the beer. The background features smooth, sunlit sand tones for a relaxed beach-day feel. Overlay elegant, minimalist text at the top that reads "Taste the Sun" in bold modern sans-serif, with a smaller tagline below: "Golden moments. Cold beer. Endless summer." The overall image is cinematic, hyper-detailed, and refreshing - a premium lifestyle campaign visual designed for social media.',
-            'Remove watermarks': 'Remove the watermark from this image',
-            'Logo': 'A minimalist logo design for a luxury skincare brand named "LUNEA". The logo features thin modern serif typography paired with a delicate crescent moon motif integrated into the text. Only two colors - moss green and ivory. Clean composition with balanced negative space on a textured off-white background. Elegant, calm, and modern wellness-inspired identity.',
-            'Remove background': 'Remove background of this image',
-            'Upscale': 'Upscale this image'
+            'Video Generator': 'A surreal, low-saturated cinematic editorial of a lone woman standing in a sun-drenched meadow of wild daisies, her windswept hair partly veiling her face as she gazes upward. Shot from a low angle with an 85mm lens feel, she\'s isolated against a vast pale-blue sky, the field softly blooming in textured foreground blur. Natural midday light creates airy highlights, her minimal black outfit adding modern contrast to the muted pastoral palette of serene blues, soft whites, and earthy tones. Add natural cinematic motion to the scene - gentle daisy sways, drifting hair, subtle light shimmer - and move the camera slowly in a floating arc for a dreamy high-fashion countryside campaign mood.',
+            'Watermark Remover': 'Remove the watermark from the image',
+            'Product Shoot': 'Surreal luxury skincare campaign scene featuring a large emerald-green serum jar floating above soft cloud layers, its glossy glass surface catching crisp sunlight with golden particles suspended inside; atop the oversized lid sits a serene woman in light neutral clothing, cross-legged in a peaceful pose. Dozens of vibrant yellow lemons drift mid-air around her in dynamic suspension, some sliced to reveal bright translucent pulp. The sky is a clear gradient blue, creating airy depth and whimsical elevation. Cinematic wide-angle perspective, ultra-realistic textures, premium high-fashion product aesthetic with dreamlike, editorial visual energy.',
+            'Avataar': 'Create a high-quality 3D stylized character portrait of Post Malone, rendered in a Pixar-realistic style. He faces the camera smiling, with a buzz cut, thick eyebrows, expressive eyes, and a full beard. His face and neck feature iconic Post Malone tattoos—script lettering, symbols, stars, hearts, and playful graphic elements—accurately placed. He wears a blue denim jacket with a brown corduroy collar and silver grills on his teeth. Clean gray studio background, soft diffused lighting, shallow depth of field, ultra-sharp focus, polished yet edgy, friendly modern character aesthetic.',
+            'Ad Creative': 'Create a cinematic night-time lifestyle ad featuring a young man sitting sideways in the driver\'s seat of a modern blue sedan with the door open, one sneakered foot extended toward the camera. He wears a white T-shirt, neutral pants, and a gold chain, holding a slice of pepperoni pizza on a paper plate and a pink "Quick Eats" smoothie cup with a straw. Raindrops cover the car, reflecting teal and warm streetlights. Shallow depth of field, glossy reflections, urban mood. Bold white text reads "The Legacy" with "hella good" beneath.',
+            'Photoshoot': 'A surreal cinematic portrait of a regal woman riding a black horse along a misty shoreline, her emerald embroidered robe drifting in the sea breeze as diffused dreamlike light casts soft highlights across the horse\'s onyx coat and subtle gold glints in the fabric. Muted aqua, soft sand, and deep black tones blend through atmospheric haze into an ethereal horizon. Shot with an 85mm full-frame look, shallow depth of field, and gentle lens bloom for a moody elevated editorial style.',
+            'Digital Art': 'A towering knight in gleaming black chrome armor stands heroically under a deep blue sky, captured from an ultra-low angle for monumental scale. Sunlight ignites brilliant star-like flares across the polished armor and the long reflective sword gripped firmly at center frame. A shimmering silver cape made of glittering, translucent mesh trails behind, catching light with iridescent sparkles. Billowing white clouds frame the figure, adding epic contrast and cinematic depth. Hyper-detailed metallic textures, crisp natural daylight, and bold high-contrast reflections create a premium fantasy campaign aesthetic-powerful, iconic, and visually arresting.',
+            'Upscale': 'Upscale the image to 8x'
         };
 
         // Helper function to get slide data
@@ -126,6 +125,7 @@
             // Autoplay settings
             autoplayEnabled: true,
             autoplayDelay: 3000, // 3 seconds between slides
+            autoplayInitialDelay: 6000, // 6 seconds delay for first slide (video)
             // Momentum physics settings
             momentumEnabled: true,
             momentumFriction: 0.78,        // Higher = slides further (0-1)
@@ -380,7 +380,7 @@
                 // Hydrate images based on visual position (what's actually in viewport during drag)
                 // Use dynamic radius based on viewport width
                 const shouldHydrate = visualDistance <= hydrationRadius;
-                const img = slide.querySelector('img');
+                const img = getMediaElement(slide);
                 if (img && shouldHydrate) {
                     hydrateImg(img);
                 }
@@ -543,7 +543,7 @@
 
                 // Hydrate images based on viewport-aware radius
                 const shouldHydrate = Math.abs(distance) <= hydrationRadius;
-                const img = slide.querySelector('img');
+                const img = getMediaElement(slide);
                 if (img && shouldHydrate) {
                     hydrateImg(img);
                 }
@@ -612,6 +612,7 @@
         let autoplayTimer = null;
         let isAutoplayPaused = false;
         let autoplayPauseReason = ''; // Track why autoplay is paused
+        let isFirstAutoplay = true; // Track if this is the first autoplay transition
 
         // Autoplay functions
         function startAutoplay() {
@@ -620,9 +621,24 @@
             stopAutoplay(); // Clear any existing timer
 
             if (!isAutoplayPaused) {
-                autoplayTimer = setInterval(() => {
-                    goToNext();
-                }, CONFIG.autoplayDelay);
+                if (isFirstAutoplay) {
+                    // Wait 6 seconds on slide 0 (video plays), then start normal autoplay
+                    autoplayTimer = setTimeout(() => {
+                        isFirstAutoplay = false; // Mark that initial delay is done
+
+                        // Start normal autoplay interval from slide 0
+                        if (!isAutoplayPaused) {
+                            autoplayTimer = setInterval(() => {
+                                goToNext();
+                            }, CONFIG.autoplayDelay);
+                        }
+                    }, CONFIG.autoplayInitialDelay);
+                } else {
+                    // Normal autoplay interval
+                    autoplayTimer = setInterval(() => {
+                        goToNext();
+                    }, CONFIG.autoplayDelay);
+                }
             } else {
             }
         }
@@ -630,6 +646,7 @@
         function stopAutoplay() {
             if (autoplayTimer) {
                 clearInterval(autoplayTimer);
+                clearTimeout(autoplayTimer);
                 autoplayTimer = null;
             }
         }
@@ -638,6 +655,11 @@
             isAutoplayPaused = true;
             autoplayPauseReason = reason;
             stopAutoplay();
+
+            // If user interacts before first autoplay completes, skip the initial delay
+            if (isFirstAutoplay) {
+                isFirstAutoplay = false;
+            }
         }
 
         function resumeAutoplay() {
@@ -914,11 +936,31 @@
             }
         }
 
-        // ===== IMAGE LOADING HELPERS =====
-        // Prevent clones from downloading images unnecessarily
+        // ===== IMAGE/VIDEO LOADING HELPERS =====
+        // Prevent clones from downloading images/videos unnecessarily
+
+        // Helper to get media element (img or video) from a slide
+        function getMediaElement(slide) {
+            return slide.querySelector('img') || slide.querySelector('video');
+        }
 
         function unloadImg(img) {
-            if (!img || img.tagName !== 'IMG') return;
+            if (!img) return;
+
+            // Handle video elements
+            if (img.tagName === 'VIDEO') {
+                const srcAttr = img.getAttribute('src');
+                if (srcAttr) {
+                    img.dataset.originalSrc = srcAttr;
+                }
+                img.pause();
+                img.removeAttribute('src');
+                img.load(); // Reset video element
+                return;
+            }
+
+            // Handle image elements
+            if (img.tagName !== 'IMG') return;
 
             // Store original attributes for later restoration (use getAttribute to check attribute, not property)
             const srcAttr = img.getAttribute('src');
@@ -937,7 +979,25 @@
         }
 
         function hydrateImg(img) {
-            if (!img || img.tagName !== 'IMG') return;
+            if (!img) return;
+
+            // Handle video elements
+            if (img.tagName === 'VIDEO') {
+                const hasStoredSrc = !!img.dataset.originalSrc;
+                const hasSrc = img.hasAttribute('src');
+
+                if (hasStoredSrc && !hasSrc) {
+                    img.setAttribute('src', img.dataset.originalSrc);
+                    img.load();
+                    img.play().catch(() => {}); // Play video, ignore errors
+                } else if (hasSrc) {
+                    img.play().catch(() => {}); // Ensure video is playing
+                }
+                return;
+            }
+
+            // Handle image elements
+            if (img.tagName !== 'IMG') return;
 
             const hasSrc = img.hasAttribute('src');
             const hasSrcset = img.hasAttribute('srcset');
@@ -1022,13 +1082,19 @@
                     state.marginLeft = -state.width / 2;
                     state.marginTop = -state.height / 2;
 
-                    // Apply interpolated values
-                    slide.style.transform = `translateX(${state.x}px) translateZ(0)`;
-                    slide.style.opacity = state.opacity.toString();
-                    slide.style.width = `${state.width}px`;
-                    slide.style.height = `${state.height}px`;
-                    slide.style.marginLeft = `${state.marginLeft}px`;
-                    slide.style.marginTop = `${state.marginTop}px`;
+                    // Apply interpolated values using Motion One for consistency
+                    animate(
+                        slide,
+                        {
+                            x: state.x,
+                            opacity: state.opacity,
+                            width: `${state.width}px`,
+                            height: `${state.height}px`,
+                            marginLeft: `${state.marginLeft}px`,
+                            marginTop: `${state.marginTop}px`,
+                        },
+                        { duration: 0 }
+                    );
 
                     // Check if position and size have settled
                     const threshold = 1.5;
@@ -1126,8 +1192,8 @@
                 clone.removeAttribute('data-slide-index'); // Mark as clone
                 clone.setAttribute('data-clone', 'before');
 
-                // Unload images from clone to prevent unnecessary downloads
-                const img = clone.querySelector('img');
+                // Unload media from clone to prevent unnecessary downloads
+                const img = getMediaElement(clone);
                 if (img) {
                     unloadImg(img);
                 }
@@ -1140,8 +1206,8 @@
                 clone.removeAttribute('data-slide-index'); // Mark as clone
                 clone.setAttribute('data-clone', 'after');
 
-                // Unload images from clone to prevent unnecessary downloads
-                const img = clone.querySelector('img');
+                // Unload media from clone to prevent unnecessary downloads
+                const img = getMediaElement(clone);
                 if (img) {
                     unloadImg(img);
                 }
@@ -1289,6 +1355,7 @@
             dragStartActiveIndex = activeIndex;
 
             // Position all slides at their final positions with opacity 0
+            // USE MOTION ONE from the start to avoid transform mismatch
             slideElements.forEach((slide, index) => {
                 const distance = index - activeIndex;
                 const isActive = distance === 0;
@@ -1303,18 +1370,25 @@
                 // For LCP optimization: only hydrate active slide initially
                 // Adjacent slides will be hydrated after initial load
                 const shouldHydrate = distance === 0;
-                const img = slide.querySelector('img');
+                const img = getMediaElement(slide);
                 if (img && shouldHydrate) {
                     hydrateImg(img);
                 }
 
-                // Directly set initial styles at final positions but invisible
-                slide.style.transform = `translateX(${baseX}px) translateZ(0)`;
-                slide.style.opacity = '0';
-                slide.style.width = `${width}px`;
-                slide.style.height = `${height}px`;
-                slide.style.marginLeft = `${-width / 2}px`;
-                slide.style.marginTop = `${-height / 2}px`;
+                // Use Motion One with duration 0 for instant positioning
+                // This ensures consistent transform handling with later animations
+                animate(
+                    slide,
+                    {
+                        x: baseX,
+                        opacity: 0,
+                        width: `${width}px`,
+                        height: `${height}px`,
+                        marginLeft: `${-width / 2}px`,
+                        marginTop: `${-height / 2}px`,
+                    },
+                    { duration: 0 }
+                );
             });
 
             // Hydrate nearby slides after initial load for smooth interaction
@@ -1323,7 +1397,7 @@
                 slideElements.forEach((slide, index) => {
                     const distance = Math.abs(index - activeIndex);
                     if (distance > 0 && distance <= hydrationRadius) {
-                        const img = slide.querySelector('img');
+                        const img = getMediaElement(slide);
                         if (img) {
                             hydrateImg(img);
                         }
@@ -1331,14 +1405,14 @@
                 });
             }, 100);
 
-            // Fade in slides smoothly
-            // Use setTimeout to ensure initial styles are rendered first
+            // Fade in slides smoothly after initial positioning settles
+            // Small delay ensures Motion One has processed the initial state
             setTimeout(() => {
                 slideElements.forEach((slide, index) => {
                     const distance = index - activeIndex;
                     const opacity = getOpacity(distance);
 
-                    // Only animate opacity - positions are already set
+                    // Only animate opacity - positions already set by Motion One
                     animate(
                         slide,
                         {
@@ -1352,7 +1426,7 @@
                 });
 
                 updateControls(activeIndex);
-            }, 50);
+            }, 100);
 
             // Add drag event listeners to viewport ONLY
             // Document listeners will be added dynamically when drag starts
@@ -1439,19 +1513,26 @@
 
                     // Hydrate images based on viewport-aware radius
                     const shouldHydrate = Math.abs(distance) <= hydrationRadius;
-                    const img = slide.querySelector('img');
+                    const img = getMediaElement(slide);
                     if (img && shouldHydrate) {
                         hydrateImg(img);
                     }
 
-                    // Use direct style manipulation for instant positioning
-                    slide.style.transform = `translateX(${baseX}px) translateZ(0)`;
-                    slide.style.opacity = opacity.toString();
-                    slide.style.width = `${width}px`;
-                    slide.style.height = `${height}px`;
-                    slide.style.marginLeft = `${-width / 2}px`;
-                    slide.style.marginTop = `${-height / 2}px`;
                     slide.style.zIndex = zIndex.toString();
+
+                    // Use Motion One with duration 0 for instant, consistent positioning
+                    animate(
+                        slide,
+                        {
+                            x: baseX,
+                            opacity: opacity,
+                            width: `${width}px`,
+                            height: `${height}px`,
+                            marginLeft: `${-width / 2}px`,
+                            marginTop: `${-height / 2}px`,
+                        },
+                        { duration: 0 }
+                    );
                 });
 
                 // Resume autoplay
@@ -1522,9 +1603,15 @@
         document.addEventListener('click', handleClickOutside, { passive: true });
 
         // ⚡ PERFORMANCE OPTIMIZATION: Defer carousel initialization
-        // Wait for LCP before initializing to avoid blocking main thread
-        function deferredInit() {
+        // Wait for Motion One to load AND LCP before initializing
+        async function deferredInit() {
             performance.mark('carousel-init-start');
+
+            // CRITICAL: Ensure Motion One is loaded before initializing
+            // This prevents using the fallback animate function which is less reliable
+            if (!animate || animate === animateFallback) {
+                await loadMotionOne();
+            }
 
             // Check if DOM is ready
             if (document.readyState === 'loading') {

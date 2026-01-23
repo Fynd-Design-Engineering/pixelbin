@@ -97,17 +97,17 @@ document.addEventListener("DOMContentLoaded", () => {
     updateAddButtonState();
   };
 
-  // Textarea rows - 2 rows when image attached, 5 rows when focused with no image
+  // Textarea rows - 1 row when image attached or not focused, 5 rows when focused with no image
   const applyTextAreaRows = () => {
     if (!textArea) return;
     const hasImages = state.images.length > 0;
     const isFocused = document.activeElement === textArea;
 
     // Calculate target rows
-    const targetRows = hasImages ? 2 : (isFocused ? 5 : 2);
+    const targetRows = hasImages ? 1 : (isFocused ? 5 : 1);
 
     // Set explicit height for smooth transition
-    const lineHeight = 24; // matches CSS line-height
+    const lineHeight = 28; // Updated for better single-row visibility
     const targetHeight = targetRows * lineHeight;
 
     // Apply height directly for smooth expand/collapse animation

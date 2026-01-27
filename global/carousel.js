@@ -123,9 +123,9 @@
             activeWidth: isMobile ? 328 : 748,
             activeHeight: 437,
             // Autoplay settings
-            autoplayEnabled: true,
+            autoplayEnabled: false,
             autoplayDelay: 3000, // 3 seconds between slides
-            autoplayInitialDelay: 6000, // 6 seconds delay for first slide (video)
+            autoplayInitialDelay: 8000, // 8 seconds delay for first slide (video)
             // Momentum physics settings
             momentumEnabled: true,
             momentumFriction: 0.78,        // Higher = slides further (0-1)
@@ -655,11 +655,6 @@
             isAutoplayPaused = true;
             autoplayPauseReason = reason;
             stopAutoplay();
-
-            // If user interacts before first autoplay completes, skip the initial delay
-            if (isFirstAutoplay) {
-                isFirstAutoplay = false;
-            }
         }
 
         function resumeAutoplay() {

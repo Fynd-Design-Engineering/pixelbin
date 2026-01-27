@@ -416,6 +416,12 @@ document.addEventListener("DOMContentLoaded", () => {
   generateButton?.addEventListener("click", (e) => {
     e.preventDefault();
 
+    const currentSlide = window.aiPhotoCarousel?.getCurrentSlide?.();
+    if (currentSlide?.label === "Video Generator") {
+      window.location.href = "https://console.pixelbin.io/auth/login?redirectTo=/studio/video-generator";
+      return;
+    }
+
     let promptLive;
 
     // If typewriter is active, get the FULL prompt directly from carousel
@@ -459,7 +465,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Check if carousel has an injectable image but user hasn't focused yet
-    const currentSlide = window.aiPhotoCarousel?.getCurrentSlide?.();
     const hasInjectableImage = currentSlide?.injectUrl?.trim();
 
     // If no images and carousel has injectable image, show tooltip and trigger injection

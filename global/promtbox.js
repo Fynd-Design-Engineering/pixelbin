@@ -807,7 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Redirect helper
   window.pbBuildStudioRedirect = (toolRoute, imageUrl, prompt) => {
     const params = new URLSearchParams();
-    if (imageUrl) params.set("imageUrl", imageUrl);
+    if (imageUrl) params.set("image", imageUrl);
     if (prompt) params.set("transformationPrompt", prompt);
     const redirectTo = params.toString() ? `${toolRoute}?${params.toString()}` : toolRoute;
     const final = `${PB_ENV.CONSOLE_BASE}/choose-org?redirectTo=${encodeURIComponent(redirectTo)}`;

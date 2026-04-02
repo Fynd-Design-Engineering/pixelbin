@@ -2,7 +2,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("searchContainer");
 
-  const TOOL_NAME = (container.dataset.toolName || "ai-editor").trim();
   const MAX_CHARS = parseInt(container.dataset.maxChars || "1000", 10);
   const HINT_ON_SUBMIT_ONLY = false;
 
@@ -476,7 +475,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const studioRoute = `/studio/${TOOL_NAME}`;
+    // Route based on slide category
+    const IMAGE_EDITOR_LABELS = ['Image Editor', 'Upscale', 'Watermark Remover'];
+    const studioRoute = IMAGE_EDITOR_LABELS.includes(currentSlide?.label)
+      ? '/studio/ai-image-editor/new'
+      : '/studio/ai-image-generator';
     setGenerating(true);
 
     // Prompt-only path

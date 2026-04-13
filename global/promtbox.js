@@ -416,8 +416,28 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
 
     const currentSlide = window.aiPhotoCarousel?.getCurrentSlide?.();
-    if (currentSlide?.label === "Video Generator") {
-      window.location.href = "https://console.pixelbin.io/auth/login?redirectTo=/studio/video-generator";
+    // Route to public tool pages instead of console
+    const TOOL_PAGE_URLS = {
+      'Video Generator': 'https://www.pixelbin.io/ai-tools/video-generator',
+      'Image Generator': 'https://www.pixelbin.io/ai-tools/ai-image-generator',
+      'Image Editor': 'https://www.pixelbin.io/ai-tools/image-editor',
+    };
+
+    // Map all slide labels to their category tool page
+    const IMAGE_EDITOR_LABELS = ['Image Editor', 'Upscale', 'Watermark Remover'];
+    const IMAGE_GENERATOR_LABELS = ['Image Generator', 'Avataar', 'Ad Creative', 'Photoshoot'];
+
+    let toolPageUrl;
+    if (currentSlide?.label === 'Video Generator') {
+      toolPageUrl = TOOL_PAGE_URLS['Video Generator'];
+    } else if (IMAGE_EDITOR_LABELS.includes(currentSlide?.label)) {
+      toolPageUrl = TOOL_PAGE_URLS['Image Editor'];
+    } else if (IMAGE_GENERATOR_LABELS.includes(currentSlide?.label)) {
+      toolPageUrl = TOOL_PAGE_URLS['Image Generator'];
+    }
+
+    if (toolPageUrl) {
+      window.location.href = toolPageUrl;
       return;
     }
 
@@ -475,11 +495,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Route based on slide category
-    const IMAGE_EDITOR_LABELS = ['Image Editor', 'Upscale', 'Watermark Remover'];
-    const studioRoute = IMAGE_EDITOR_LABELS.includes(currentSlide?.label)
-      ? '/studio/ai-image-editor/new'
-      : '/studio/ai-image-generator';
     setGenerating(true);
 
     // Prompt-only path
